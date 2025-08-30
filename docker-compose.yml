@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  app:
+    build: ./app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app
+    depends_on:
+      - db
+    env_file:
+      - .env
+
+  db:
+    image: postgres:15-alpine  # Using a recent, lightweight version of Postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - .env
+
+volumes:
+  postgres_data:

@@ -1,0 +1,9 @@
+# Environment variables
+.env
+
+# Python artifacts
+__pycache__/
+*.pyc
+
+# Docker
+.dockerignore
