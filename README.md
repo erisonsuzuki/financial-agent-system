@@ -35,11 +35,8 @@ This project is an investment management system that uses an architecture of AI 
     ```
     The API will be available at `http://localhost:8000`.
 
-4.  **Run Tests (Recommended):**
-    Verify that the initial setup is correct by running the test suite.
-    ```sh
-    make test
-    ```
+### Development Workflow 
+This project is configured for hot reloading. Thanks to the `docker-compose.override.yml` file, when you run `make up`, the application server will automatically restart whenever you save changes to a Python file in the `app/` directory. You can view the reloading messages by running `make logs`.
 
 ## Testing
 This project uses `pytest` for unit testing. The tests are located in the `tests/` directory.
@@ -53,7 +50,7 @@ The tests run against a separate, in-memory SQLite database for speed and isolat
 
 ## Common Commands
 
-  - `make up`: Build and start all services.
+  - `make up`: Build and start all services (with hot reloading).
   - `make down`: Stop and remove all services.
   - `make clean`: Stop services, remove containers, volumes, and images for this project.
   - `make logs`: View the logs from all running services.
