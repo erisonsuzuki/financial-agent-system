@@ -1,15 +1,20 @@
-# Build and start the services in detached mode
 up:
 	docker compose up -d --build
 
-# Stop and remove the services
 down:
 	docker compose down
 
-# Show logs for all services
+clean:
+	docker compose down --volumes --rmi all
+
 logs:
 	docker compose logs -f
 
-# Access the application container's shell
 shell:
 	docker compose exec app bash
+
+db-shell:
+	docker compose exec db psql -U user -d financialdb
+
+test:
+	docker compose exec app pytest

@@ -8,7 +8,7 @@
 
 The project is an investment management system focused on Stocks and Real Estate Investment Trusts (REITs). The system's core is an AI agent architecture, designed to be modular and scalable.
 
-* **Project Repository:** [https://github.com/erisonsuzuki/financial_agent_system](https://github.com/erisonsuzuki/financial_agent_system)
+* **Project Repository:** https://github.com/erisonsuzuki/financial_agent_system
 * **Core Architecture:** The business logic is distributed among specialized agents, each with a unique responsibility (Market Data Fetching, Financial Calculations, Database Persistence, Report Generation).
 * **Orchestration:** An orchestrator agent, implemented with LangGraph, manages the communication flow and the sequence of tasks among the other agents to fulfill user requests.
 * **LLM Models:** The system is designed to be LLM-agnostic, allowing integration with cloud APIs (like Google Gemini) and local models (via Ollama) through LangChain's abstractions.
@@ -29,7 +29,8 @@ All technological choices—from language versions to libraries and architectura
 * **Database:** PostgreSQL (latest stable release, e.g., 15+)
 * **Containerization:** Docker and Docker Compose
 * **AI Libraries:** LangChain and LangGraph
-* **Code Principles:** All development must follow industry best practices, including SOLID principles, Clean Code, and the creation of comprehensive unit tests to ensure code quality and robustness.
+* **Code Principles:** All development must follow industry best practices, including SOLID principles and Clean Code.
+* **Comprehensive Testing:** All business logic (e.g., CRUD functions) and API endpoints must be accompanied by corresponding unit and integration tests. We will use the `pytest` framework for implementation. Tests will be isolated and run against a separate, in-memory test database to ensure they are fast and do not depend on external services. A `make test` command will be available to run the entire test suite.
 
 ### 1.3. Principle of Conciseness:
     - My objective is to be efficient. I must always prioritize clarity and simplicity.
@@ -38,18 +39,32 @@ All technological choices—from language versions to libraries and architectura
 
 ## 2. Workflow: Our Mode of Operation
 
-### 2.1. Task Lifecycle: Blueprint -> Human Approval -> Code Generation -> Human Analysis -> Learning
-### 2.2. How I Present the Blueprint and Report Progress
-### 2.3. Feedback and Learning Loop (Post-Code Generation):
-    - After the final code is generated, it will be analyzed by you (the user). I must actively process all feedback, corrections, or suggestions you give me about the code I delivered.
+### 2.1. Task Lifecycle: Blueprint -> Internal Review -> Human Approval -> Implementation -> Learning
+    
+### 2.2. Internal Code Review & Verification
+    - Before presenting any blueprint or code fix, I will perform a rigorous internal analysis to verify correctness, check for import errors, and ensure all parts of the code are consistent with our established architecture.
+    - This proactive quality control step is designed to prevent errors and ensure that all proposals are functional and follow best practices.
+
+### 2.3. Feedback and Learning Loop
+    - After implementation, I must actively process all feedback, corrections, or suggestions.
     - Based on this feedback, I must identify learning opportunities and suggest updates to this `prd-core.md` to improve my future performance.
 
 ### 2.4. Living Documentation
-    - At the conclusion of each implemented phase, the project's `README.md` file must be updated.
-    - This update should reflect any new setup instructions, environment variables, `Makefile` commands, or architectural decisions made during the phase.
-    - This ensures the `README.md` always serves as an accurate and up-to-date entry point for any developer joining the project.
+    - At the conclusion of each implemented phase, the project's `README.md` file must be updated to reflect any new setup instructions, environment variables, or architectural decisions.
 
 ## 3. Output: Process Documentation Standard
 
 ### 3.1. Structure of the Final Implementation Report
 ### 3.2. Points to Include: Blueprint, Final Code, Tests, and Decisions Made
+
+## 4. Lessons Learned from Phase 2
+
+The implementation of the `/health` endpoint and its corresponding tests revealed important lessons about the interaction between FastAPI's dependency injection system and SQLAlchemy's session management.
+
+* **Dependency Injection vs. Direct Instantiation:** While FastAPI's `Depends` system is powerful for managing dependencies in regular API endpoints, it can introduce complexity in specific scenarios like a health check. The initial implementation used `Depends(get_db)`, which made it difficult to correctly mock database failures in tests. The final solution was to instantiate the `SessionLocal` directly within the `health_check` function, giving us more granular control over the session's lifecycle and simplifying the testing of failure scenarios.
+
+* **Mocking Strategy:** The test failures highlighted the importance of choosing the correct object to mock. Initially, the tests attempted to patch `sqlalchemy.orm.session.Session.execute`, which was too deep and did not correctly simulate a connection failure. The final, successful approach was to patch `app.main.SessionLocal` to control the behavior of the session creation itself.
+
+* **SQLAlchemy 2.0 Deprecation:** The `declarative_base()` function has been moved from `sqlalchemy.ext.declarative` to `sqlalchemy.orm`. This is a simple but important change to keep the codebase up-to-date and avoid deprecation warnings.
+
+These lessons will be applied to future development to ensure more robust and testable code.
