@@ -18,42 +18,33 @@ This project is an investment management system that uses an architecture of AI 
 - Make (optional, but recommended for using the provided commands)
 
 ### Setup
-1.  **Clone the repository:**
-    ```sh
-    git clone https://github.com/erisonsuzuki/financial_agent_system.git
-    cd financial_agent_system
-    ```
-2.  **Create the environment file:**
-    Copy the sample environment file and fill in your secrets (e.g., database password).
-    ```sh
-    cp .env.sample .env
-    ```
-3.  **Build and Run the Application:**
-    Use the `make` command to build the Docker images and start the services in the background.
-    ```sh
-    make up
-    ```
-    The API will be available at `http://localhost:8000`.
+1.  **Clone the repository:** `git clone https://github.com/erisonsuzuki/financial_agent_system.git` and `cd financial_agent_system`
 
-### Development Workflow 
-This project is configured for hot reloading. Thanks to the `docker-compose.override.yml` file, when you run `make up`, the application server will automatically restart whenever you save changes to a Python file in the `app/` directory. You can view the reloading messages by running `make logs`.
+2.  **Create the environment file:** Copy the sample environment file with `cp .env.sample .env` and fill in your secrets.
+
+3.  **Build and Run the Application:** Use the `make up` command to build the Docker images and start the services. The API will be available at `http://localhost:8000`.
+
+4.  **Run Tests (Recommended):** Verify that the initial setup is correct by running `make test`.
+
+## API Endpoints
+
+### Assets
+* `POST /assets/`: Create a new financial asset.
+* `GET /assets/{ticker}`: Retrieve an asset by its ticker symbol.
+* `GET /assets/{ticker}/price`: Retrieve the current market price for an asset.
 
 ## Testing
 This project uses `pytest` for unit testing. The tests are located in the `tests/` directory.
 
-To run the complete test suite, use the following command:
-```sh
-make test
-```
+To run the complete test suite, use the `make test` command.
 
 The tests run against a separate, in-memory SQLite database for speed and isolation, ensuring they do not affect the main PostgreSQL database.
 
 ## Common Commands
-
-  - `make up`: Build and start all services (with hot reloading).
-  - `make down`: Stop and remove all services.
-  - `make clean`: Stop services, remove containers, volumes, and images for this project.
-  - `make logs`: View the logs from all running services.
-  - `make shell`: Access the shell of the running application container.
-  - `make db-shell`: Connect to the PostgreSQL shell inside the database container.
-  - `make test`: Run the unit test suite.
+- `make up`: Build and start all services (with hot reloading).
+- `make down`: Stop and remove all services.
+- `make clean`: Stop services, remove containers, volumes, and images for this project.
+- `make logs`: View the logs from all running services.
+- `make shell`: Access the shell of the running application container.
+- `make db-shell`: Connect to a PostgreSQL shell inside the database container.
+- `make test`: Run the unit test suite.

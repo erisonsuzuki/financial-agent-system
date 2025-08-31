@@ -14,3 +14,8 @@ class Asset(AssetBase):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+class AssetPrice(BaseModel):
+    ticker: str
+    price: float
+    source: str = "yfinance"
