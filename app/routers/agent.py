@@ -16,10 +16,11 @@ class AgentResponse(BaseModel):
 @router.post("/query/{agent_name}", response_model=AgentResponse)
 def handle_agent_query(agent_name: str, query: AgentQuery):
     try:
+        # The agent executor will handle the "not found" case if the YAML file doesn't exist.
         answer = orchestrator_agent.invoke_agent(agent_name, query.question)
         return AgentResponse(answer=answer)
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Agent '{agent_name}' not found.")
+        raise HTTPException(status_code=404, detail=f"Agent configuration for '{agent_name}' not found.")
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

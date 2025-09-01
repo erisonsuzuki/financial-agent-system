@@ -47,7 +47,10 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
 
 ### AI Agent
 * `POST /agent/query/{agent_name}`: Send a natural language query to a specific AI agent.
-  * **Example (`registration_agent`):** `make agent-query q="Register my portfolio: 100 ITSA4 at R$10.50"`
+  * **Registration Agent (`registration_agent`):**
+    `make agent-register q="Register: 100 ITSA4 at R$10.50"`
+  * **Management Agent (`management_agent`):**
+    `make agent-manage q="Correct my last transaction for ITSA4, the price was R$10.75"`
 
 ### Assets
 * `POST /assets/`: Create a new financial asset.
@@ -78,4 +81,5 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
 - `make shell`: Access the shell of the running application container.
 - `make db-shell`: Connect to a PostgreSQL shell inside the database container.
 - `make test`: Run the unit test suite.
-- `make agent-query q="..."`: Send a query to the registration agent.
+- `make agent-register q="..."`: Send a query to the registration agent.
+- `make agent-manage q="..."`: Send a query to the management agent.

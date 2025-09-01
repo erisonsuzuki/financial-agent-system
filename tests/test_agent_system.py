@@ -51,4 +51,4 @@ def test_agent_query_agent_not_found(client: TestClient):
     )
     
     assert response.status_code == 404
-    assert "Agent 'nonexistent_agent' not found" in response.json()["detail"]
+    assert "Agent configuration for 'nonexistent_agent' not found." in response.json()["detail"]
