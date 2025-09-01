@@ -32,6 +32,7 @@ This project is an investment management system that uses an architecture of AI 
 * `POST /assets/`: Create a new financial asset.
 * `GET /assets/{ticker}`: Retrieve an asset by its ticker symbol.
 * `GET /assets/{ticker}/price`: Retrieve the current market price for an asset.
+* `GET /assets/{ticker}/analysis`: Retrieve a complete financial analysis for an asset.
 
 ### Transactions
 * `POST /assets/{ticker}/transactions/`: Add a new transaction (buy/sell) for an asset.

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app import crud, schemas
 from app.database import get_db
-from app.agents import market_data_agent
+from app.agents import market_data_agent, portfolio_analyzer_agent
 
 router = APIRouter(
     prefix="/assets",
@@ -29,3 +29,12 @@ def get_asset_price(ticker: str):
     if price is None:
         raise HTTPException(status_code=404, detail=f"Could not retrieve price for ticker {ticker}")
     return schemas.AssetPrice(ticker=ticker, price=price)
+
+@router.get("/{ticker}/analysis", response_model=schemas.AssetAnalysis)
+def get_asset_analysis(ticker: str, db: Session = Depends(get_db)):
+    db_asset = crud.get_asset_by_ticker(db, ticker=ticker)
+    if db_asset is None:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    analysis = portfolio_analyzer_agent.analyze_asset(db=db, asset=db_asset)
+    return analysis

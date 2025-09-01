@@ -47,3 +47,15 @@ class Dividend(DividendBase):
     id: int
     asset_id: int
     model_config = ConfigDict(from_attributes=True)
+
+# --- Analysis Schemas ---
+class AssetAnalysis(BaseModel):
+    ticker: str
+    total_quantity: float
+    average_price: float
+    total_invested: float
+    current_market_price: float | None
+    current_market_value: float | None
+    financial_return_value: float | None
+    financial_return_percent: float | None
+    total_dividends_received: float
