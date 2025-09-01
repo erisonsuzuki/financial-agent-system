@@ -1,9 +1,14 @@
 from fastapi import FastAPI, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
+
+# Import and execute the logging configuration 
+from app.logging_config import setup_logging
+setup_logging()
+
 from app import models
 from app.database import engine, SessionLocal
-from app.routers import assets, transactions, dividends
+from app.routers import assets, transactions, dividends, agent
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -16,6 +21,7 @@ app = FastAPI(
 app.include_router(assets.router)
 app.include_router(transactions.router)
 app.include_router(dividends.router)
+app.include_router(agent.router)
 
 @app.get("/")
 def read_root():

@@ -57,7 +57,9 @@ All technological choices—from language versions to libraries and architectura
 ### 3.1. Structure of the Final Implementation Report
 ### 3.2. Points to Include: Blueprint, Final Code, Tests, and Decisions Made
 
-## 4. Lessons Learned from Phase 2
+## 4. Lessons Learned 
+
+### Lessons Learned from Phase 2
 
 The implementation of the `/health` endpoint and its corresponding tests revealed important lessons about the interaction between FastAPI's dependency injection system and SQLAlchemy's session management.
 
@@ -78,3 +80,8 @@ The implementation of the `PortfolioAnalyzerAgent` revealed a critical issue reg
 ### Lessons Learned from Refactoring/Testing 
 
 * **JSON Serialization of Decimals:** When FastAPI serializes Pydantic models containing `Decimal` types into JSON, it converts them to strings to preserve precision. Consequently, API tests that check these values in a JSON response must assert against the **string representation** of the decimal number (e.g., `assert data["price"] == "150.75"`), not the float or Decimal object itself.
+
+### Lessons Learned from Phase 8
+* **Modern Tool Definition in LangChain:** Initial deprecation warnings from LangChain's use of Pydantic V1 methods (`.parse_obj`, `.dict`) were observed. The root cause was the use of the `args_schema` parameter in the `@tool` decorator. The modern, correct, and Pydantic V2-compliant solution is to define tool arguments directly in the function signature using `typing.Annotated`. This approach is cleaner, more pythonic, and resolves the deprecation warnings. This is the standard for all tool definitions going forward.
+
+* **Managing Log Noise from Third-Party Libraries:** Harmless but verbose warnings (e.g., `Key 'title' is not supported...`) were being emitted by internal LangChain loggers. The most robust and precise solution, rather than using broad filters or global log level changes, is to **identify the specific logger by its full name** (e.g., `langchain_google_genai._function_utils`) and **surgically set its log level** to a higher threshold (e.g., `logging.ERROR`). This is best managed in a centralized `app/logging_config.py` module, providing precise control over log noise without affecting desired application logs.
