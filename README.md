@@ -49,11 +49,26 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
 * `POST /agent/query/{agent_name}`: Send a natural language query to a specific AI agent.
   * **Example (`registration_agent`):** `make agent-query q="Register my portfolio: 100 ITSA4 at R$10.50"`
 
-### Data Management
+### Assets
 * `POST /assets/`: Create a new financial asset.
-* `GET /assets/{ticker}`: Retrieve an asset by its ticker symbol.
-* `POST /assets/{ticker}/transactions/`: Add a new transaction for an asset.
-* `GET /assets/{ticker}/transactions/`: List all transactions for an asset.
+* `GET /assets/`: List all assets.
+* `GET /assets/{asset_id}`: Retrieve an asset by its ID.
+* `PUT /assets/{asset_id}`: Update an asset's details.
+* `DELETE /assets/{asset_id}`: Delete an asset.
+* `GET /assets/{ticker}/price`: Retrieve the current market price for an asset.
+* `GET /assets/{ticker}/analysis`: Retrieve a complete financial analysis for an asset.
+
+### Transactions
+* `POST /transactions/`: Add a new transaction for an asset.
+* `GET /transactions/{transaction_id}`: Get a specific transaction by its ID.
+* `PUT /transactions/{transaction_id}`: Update a transaction.
+* `DELETE /transactions/{transaction_id}`: Delete a transaction.
+
+### Dividends
+* `POST /dividends/`: Add a new dividend for an asset.
+* `GET /dividends/{dividend_id}`: Get a specific dividend by its ID.
+* `PUT /dividends/{dividend_id}`: Update a dividend.
+* `DELETE /dividends/{dividend_id}`: Delete a dividend.
 
 ## Common Commands
 - `make up`: Build and start all services (with hot reloading).

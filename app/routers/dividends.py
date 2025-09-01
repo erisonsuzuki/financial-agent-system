@@ -5,21 +5,35 @@ from app import crud, schemas
 from app.database import get_db
 
 router = APIRouter(
-    prefix="/assets/{ticker}/dividends",
+    prefix="/dividends",
     tags=["Dividends"],
 )
 
 @router.post("/", response_model=schemas.Dividend, status_code=status.HTTP_201_CREATED)
-def add_dividend_for_asset(ticker: str, dividend: schemas.DividendCreate, db: Session = Depends(get_db)):
-    db_asset = crud.get_asset_by_ticker(db, ticker=ticker)
+def add_dividend(dividend: schemas.DividendCreate, db: Session = Depends(get_db)):
+    # Check if asset exists
+    db_asset = crud.get_asset(db, asset_id=dividend.asset_id)
     if not db_asset:
         raise HTTPException(status_code=404, detail="Asset not found")
-    return crud.create_asset_dividend(db=db, dividend=dividend, asset_id=db_asset.id)
+    return crud.create_asset_dividend(db=db, dividend=dividend)
 
-@router.get("/", response_model=List[schemas.Dividend])
-def list_dividends_for_asset(ticker: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    db_asset = crud.get_asset_by_ticker(db, ticker=ticker)
-    if not db_asset:
-        raise HTTPException(status_code=404, detail="Asset not found")
-    dividends = crud.get_dividends_for_asset(db=db, asset_id=db_asset.id, skip=skip, limit=limit)
-    return dividends
+@router.get("/{dividend_id}", response_model=schemas.Dividend)
+def read_dividend(dividend_id: int, db: Session = Depends(get_db)):
+    db_dividend = crud.get_dividend(db, dividend_id=dividend_id)
+    if db_dividend is None:
+        raise HTTPException(status_code=404, detail="Dividend not found")
+    return db_dividend
+
+@router.put("/{dividend_id}", response_model=schemas.Dividend)
+def update_existing_dividend(dividend_id: int, dividend_in: schemas.DividendUpdate, db: Session = Depends(get_db)):
+    db_dividend = crud.get_dividend(db, dividend_id=dividend_id)
+    if not db_dividend:
+        raise HTTPException(status_code=404, detail="Dividend not found")
+    return crud.update_dividend(db=db, db_dividend=db_dividend, dividend_in=dividend_in)
+
+@router.delete("/{dividend_id}", response_model=schemas.Dividend)
+def delete_existing_dividend(dividend_id: int, db: Session = Depends(get_db)):
+    db_dividend = crud.delete_dividend(db, dividend_id=dividend_id)
+    if not db_dividend:
+        raise HTTPException(status_code=404, detail="Dividend not found")
+    return db_dividend

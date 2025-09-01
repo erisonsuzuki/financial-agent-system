@@ -10,6 +10,10 @@ class AssetBase(BaseModel):
     asset_type: AssetType
     sector: str | None = None
 
+class AssetUpdate(BaseModel):
+    name: str | None = None
+    sector: str | None = None
+
 class AssetCreate(AssetBase):
     pass
 
@@ -28,8 +32,13 @@ class TransactionBase(BaseModel):
     price: Decimal
     transaction_date: date
 
+class TransactionUpdate(BaseModel):
+    quantity: float | None = None
+    price: Decimal | None = None
+    transaction_date: date | None = None
+
 class TransactionCreate(TransactionBase):
-    pass
+    asset_id: int
 
 class Transaction(TransactionBase):
     id: int
@@ -41,8 +50,12 @@ class DividendBase(BaseModel):
     amount_per_share: Decimal
     payment_date: date
 
+class DividendUpdate(BaseModel):
+    amount_per_share: Decimal | None = None
+    payment_date: date | None = None
+
 class DividendCreate(DividendBase):
-    pass
+    asset_id: int
 
 class Dividend(DividendBase):
     id: int
