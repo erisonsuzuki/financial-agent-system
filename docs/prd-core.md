@@ -68,3 +68,13 @@ The implementation of the `/health` endpoint and its corresponding tests reveale
 * **SQLAlchemy 2.0 Deprecation:** The `declarative_base()` function has been moved from `sqlalchemy.ext.declarative` to `sqlalchemy.orm`. This is a simple but important change to keep the codebase up-to-date and avoid deprecation warnings.
 
 These lessons will be applied to future development to ensure more robust and testable code.
+
+### Lessons Learned from Phase 6 
+The implementation of the `PortfolioAnalyzerAgent` revealed a critical issue regarding the precision of financial calculations in Python.
+
+* **Floating-Point Imprecision:** Unit tests failed due to subtle inaccuracies in calculations using the standard `float` type and Python's default rounding behavior. For example, `round(40.625, 2)` results in `40.62`, not `40.63`. This level of imprecision is unacceptable for financial applications.
+* **The `Decimal` Standard:** The correct solution, adopted as a new standard for this project, is to use Python's `Decimal` type for all monetary values and calculations. For database storage, the corresponding `Numeric` type from SQLAlchemy will be used. This ensures mathematical precision and predictable rounding, which are non-negotiable requirements for financial data. This led to the creation of a dedicated refactoring phase (Phase 7) to apply this standard across the entire application.
+
+### Lessons Learned from Refactoring/Testing 
+
+* **JSON Serialization of Decimals:** When FastAPI serializes Pydantic models containing `Decimal` types into JSON, it converts them to strings to preserve precision. Consequently, API tests that check these values in a JSON response must assert against the **string representation** of the decimal number (e.g., `assert data["price"] == "150.75"`), not the float or Decimal object itself.

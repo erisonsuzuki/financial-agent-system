@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, Enum as SQLAlchemyEnum
+from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, Enum as SQLAlchemyEnum, Numeric
 from sqlalchemy.orm import relationship
 from app.database import Base
 import enum
@@ -22,7 +22,7 @@ class Transaction(Base):
     id = Column(Integer, primary_key=True, index=True)
     asset_id = Column(Integer, ForeignKey("assets.id"), nullable=False)
     quantity = Column(Float, nullable=False)
-    price = Column(Float, nullable=False)
+    price = Column(Numeric(10, 2), nullable=False)
     transaction_date = Column(Date, nullable=False)
     asset = relationship("Asset", back_populates="transactions")
 
@@ -30,6 +30,6 @@ class Dividend(Base):
     __tablename__ = "dividends"
     id = Column(Integer, primary_key=True, index=True)
     asset_id = Column(Integer, ForeignKey("assets.id"), nullable=False)
-    amount_per_share = Column(Float, nullable=False)
+    amount_per_share = Column(Numeric(10, 4), nullable=False)
     payment_date = Column(Date, nullable=False)
     asset = relationship("Asset", back_populates="dividends")

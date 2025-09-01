@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 from app.models import AssetType
 from datetime import date
+from decimal import Decimal
 
 # --- Asset Schemas ---
 class AssetBase(BaseModel):
@@ -18,13 +19,13 @@ class Asset(AssetBase):
 
 class AssetPrice(BaseModel):
     ticker: str
-    price: float
+    price: Decimal
     source: str = "yfinance"
 
 # --- Transaction Schemas ---
 class TransactionBase(BaseModel):
     quantity: float
-    price: float
+    price: Decimal
     transaction_date: date
 
 class TransactionCreate(TransactionBase):
@@ -37,7 +38,7 @@ class Transaction(TransactionBase):
 
 # --- Dividend Schemas ---
 class DividendBase(BaseModel):
-    amount_per_share: float
+    amount_per_share: Decimal
     payment_date: date
 
 class DividendCreate(DividendBase):
@@ -52,10 +53,10 @@ class Dividend(DividendBase):
 class AssetAnalysis(BaseModel):
     ticker: str
     total_quantity: float
-    average_price: float
-    total_invested: float
-    current_market_price: float | None
-    current_market_value: float | None
-    financial_return_value: float | None
-    financial_return_percent: float | None
-    total_dividends_received: float
+    average_price: Decimal
+    total_invested: Decimal
+    current_market_price: Decimal | None
+    current_market_value: Decimal | None
+    financial_return_value: Decimal | None
+    financial_return_percent: Decimal | None
+    total_dividends_received: Decimal
