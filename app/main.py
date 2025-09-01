@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from app import models
 from app.database import engine, SessionLocal
-from app.routers import assets
+from app.routers import assets, transactions, dividends
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -14,6 +14,8 @@ app = FastAPI(
 )
 
 app.include_router(assets.router)
+app.include_router(transactions.router)
+app.include_router(dividends.router)
 
 @app.get("/")
 def read_root():

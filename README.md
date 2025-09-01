@@ -33,6 +33,14 @@ This project is an investment management system that uses an architecture of AI 
 * `GET /assets/{ticker}`: Retrieve an asset by its ticker symbol.
 * `GET /assets/{ticker}/price`: Retrieve the current market price for an asset.
 
+### Transactions
+* `POST /assets/{ticker}/transactions/`: Add a new transaction (buy/sell) for an asset.
+* `GET /assets/{ticker}/transactions/`: List all transactions for an asset.
+
+### Dividends
+* `POST /assets/{ticker}/dividends/`: Add a new dividend payment for an asset.
+* `GET /assets/{ticker}/dividends/`: List all dividend payments for an asset.
+
 ## Testing
 This project uses `pytest` for unit testing. The tests are located in the `tests/` directory.
 
