@@ -1,4 +1,5 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
+from typing import Optional
 from . import models, schemas
 
 # --- Asset CRUD ---
@@ -37,6 +38,12 @@ def delete_asset(db: Session, asset_id: int) -> models.Asset:
 # --- Transaction CRUD ---
 def get_transaction(db: Session, transaction_id: int) -> models.Transaction | None:
     return db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+
+def get_transactions(db: Session, asset_id: Optional[int] = None, skip: int = 0, limit: int = 100) -> list[models.Transaction]:
+    query = db.query(models.Transaction).options(joinedload(models.Transaction.asset)).order_by(models.Transaction.transaction_date.desc())
+    if asset_id is not None:
+        query = query.filter(models.Transaction.asset_id == asset_id)
+    return query.offset(skip).limit(limit).all()
 
 def create_asset_transaction(db: Session, transaction: schemas.TransactionCreate) -> models.Transaction:
     db_transaction = models.Transaction(**transaction.model_dump())

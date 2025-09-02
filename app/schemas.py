@@ -10,6 +10,10 @@ class AssetBase(BaseModel):
     asset_type: AssetType
     sector: str | None = None
 
+class AssetInTransaction(BaseModel):
+    ticker: str
+    model_config = ConfigDict(from_attributes=True)
+
 class AssetUpdate(BaseModel):
     name: str | None = None
     sector: str | None = None
@@ -42,7 +46,7 @@ class TransactionCreate(TransactionBase):
 
 class Transaction(TransactionBase):
     id: int
-    asset_id: int
+    asset: AssetInTransaction
     model_config = ConfigDict(from_attributes=True)
 
 # --- Dividend Schemas ---

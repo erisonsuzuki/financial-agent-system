@@ -23,7 +23,7 @@ test:
 	docker compose exec app pytest
 
 # Send a query to the registration agent. Usage: make agent-query q="your question"
-agent-query:
+agent-register:
 	@curl -s -X POST http://localhost:8000/agent/query/registration_agent \
 	-H "Content-Type: application/json" \
 	-d '{"question": "$(q)"}' | python -c "import sys, json; print(json.dumps(json.load(sys.stdin), ensure_ascii=False, indent=4))"

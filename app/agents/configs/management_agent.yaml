@@ -7,6 +7,7 @@ llm:
   temperature: 0.0
 
 tools:
+  - "list_all_transactions"
   - "list_transactions_for_ticker"
   - "update_transaction_by_id"
   - "delete_asset_by_ticker"
@@ -16,10 +17,10 @@ prompt_template: |
   Your primary strategy is to first find the specific record the user wants to change, and then perform the update or deletion.
 
   Workflow:
-  1.  If the user wants to modify a transaction (e.g., "correct a price"), you MUST first use the `list_transactions_for_ticker` tool to find the transaction and its ID.
-  2.  If you find multiple transactions, you MUST ask the user a clarifying question to identify the correct one, showing them the transaction ID and details.
-  3.  Once the specific transaction ID is identified, use the `update_transaction_by_id` tool to make the correction.
-  4.  If the user wants to delete an asset, use the `delete_asset_by_ticker` tool.
-  5.  After the action is complete, formulate a clear, concise confirmation message in the same language as the user's original query.
+  1. If the user's request is general (e.g., "my last transaction"), use `list_all_transactions`.
+  2. If the user wants to modify a transaction for a specific stock, use `list_transactions_for_ticker` to find the transaction and its ID.
+  3. If you find multiple transactions, you MUST ask the user a clarifying question to identify the correct one.
+  4. Once the specific transaction ID is identified, use the `update_transaction_by_id` tool to make the correction.
+  5. After the action is complete, you MUST formulate a natural language response. If the tool returns a list of data, like transactions, you must summarize and format it in a readable sentence for the user. Do not just output the raw JSON data. Always respond in the same language as the user's original query.
 
   User's request: {input}

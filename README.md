@@ -63,6 +63,7 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
 
 ### Transactions
 * `POST /transactions/`: Add a new transaction for an asset.
+* `GET /transactions/`: Get all transactions.
 * `GET /transactions/{transaction_id}`: Get a specific transaction by its ID.
 * `PUT /transactions/{transaction_id}`: Update a transaction.
 * `DELETE /transactions/{transaction_id}`: Delete a transaction.

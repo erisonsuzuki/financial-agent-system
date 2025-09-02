@@ -39,7 +39,7 @@ def create_agent_executor(agent_name: str):
     ])
     
     agent = create_tool_calling_agent(llm_with_tools, available_tools, prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=available_tools, verbose=False)
+    agent_executor = AgentExecutor(agent=agent, tools=available_tools, verbose=True)
     
     return agent_executor
 
