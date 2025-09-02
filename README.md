@@ -5,6 +5,24 @@ This project is an investment management system that uses an architecture of AI 
 ## Architecture Overview
 This project utilizes an AI-driven, tool-based agent architecture powered by LangChain. The core idea is to separate the agent's logic, configuration, and capabilities.
 
+### Request Flow Diagram
+
+```mermaid
+graph TD
+    UserQuery["User Query"] --> Orchestrator{Agent Orchestrator};
+
+    subgraph "Reasoning and Tools Loop"
+        Orchestrator -->LLM([LLM]);
+        LLM -->|Decides which Tool and arguments| Orchestrator;
+        Orchestrator -->Tools["Tools (tools.py)"];
+        Tools -->DataSources[(Database)];
+        DataSources -->|Returns Data| Tools;
+        Tools -->|Returns 'Observation'| Orchestrator;
+    end
+
+    Orchestrator -->FinalAnswer["LLM's Answer"];
+```
+
 ### Core Components
 * **Orchestrator Agent (`orchestrator_agent.py`):** This is the generic "engine". It's responsible for loading an agent's configuration, interpreting the user's natural language query, and managing the execution flow.
 * **Agent Configurations (`app/agents/configs/*.yaml`):** These YAML files define the "personality" and capabilities of each agent. They specify the prompt (the agent's instructions), the tools it's allowed to use, and the LLM model it should connect to.
