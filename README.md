@@ -70,27 +70,26 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
   * **Management Agent (`management_agent`):**
     `make agent-manage q="Correct my last transaction for ITSA4, the price was R$10.75"`
 
-### Assets
+### Data Management
 * `POST /assets/`: Create a new financial asset.
-* `GET /assets/`: List all assets.
+* `GET /assets/`: List all assets (can filter by `ticker`).
 * `GET /assets/{asset_id}`: Retrieve an asset by its ID.
 * `PUT /assets/{asset_id}`: Update an asset's details.
 * `DELETE /assets/{asset_id}`: Delete an asset.
-* `GET /assets/{ticker}/price`: Retrieve the current market price for an asset.
-* `GET /assets/{ticker}/analysis`: Retrieve a complete financial analysis for an asset.
-
-### Transactions
-* `POST /transactions/`: Add a new transaction for an asset.
-* `GET /transactions/`: Get all transactions.
+* `GET /assets/{asset_id}/transactions`: List all transactions for a specific asset.
+* `POST /transactions/`: Add a new transaction for an asset (requires `asset_id`).
+* `GET /transactions/`: List all transactions in the system.
 * `GET /transactions/{transaction_id}`: Get a specific transaction by its ID.
 * `PUT /transactions/{transaction_id}`: Update a transaction.
 * `DELETE /transactions/{transaction_id}`: Delete a transaction.
+* `POST /dividends/`: Add a new dividend payment (requires `asset_id`).
+* `GET /dividends/{dividend_id}`: Get a specific dividend payment.
+* `PUT /dividends/{dividend_id}`: Update a dividend payment.
+* `DELETE /dividends/{dividend_id}`: Delete a dividend payment.
 
-### Dividends
-* `POST /dividends/`: Add a new dividend for an asset.
-* `GET /dividends/{dividend_id}`: Get a specific dividend by its ID.
-* `PUT /dividends/{dividend_id}`: Update a dividend.
-* `DELETE /dividends/{dividend_id}`: Delete a dividend.
+### Analysis Endpoints
+* `GET /assets/{ticker}/price`: Retrieve the current market price for an asset.
+* `GET /assets/{ticker}/analysis`: Retrieve a complete financial analysis for an asset.
 
 ## Common Commands
 - `make up`: Build and start all services (with hot reloading).

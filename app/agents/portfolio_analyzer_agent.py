@@ -7,10 +7,9 @@ def analyze_asset(db: Session, asset: models.Asset) -> schemas.AssetAnalysis:
     """
     Performs a complete financial analysis for a single asset using Decimal for precision.
     """
-    transactions = crud.get_transactions_for_asset(db=db, asset_id=asset.id, limit=10000)
+    transactions = crud.get_transactions(db=db, asset_id=asset.id, limit=10000)
     dividends = crud.get_dividends_for_asset(db=db, asset_id=asset.id, limit=10000)
 
-    # Calculate portfolio state from transactions
     total_quantity = sum(Decimal(str(t.quantity)) for t in transactions)
     
     average_price = Decimal("0.00")
@@ -26,14 +25,11 @@ def analyze_asset(db: Session, asset: models.Asset) -> schemas.AssetAnalysis:
         
         total_invested = (total_quantity * average_price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-    # Calculate total dividends
+    # Note: This is a simplification. A more complex model would consider the quantity at the time of each dividend payment.
     total_dividends_received = sum(d.amount_per_share * total_quantity for d in dividends).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-    # Fetch current market data
-    price_float = market_data_agent.get_current_price(ticker=asset.ticker)
-    current_market_price = Decimal(str(price_float)) if price_float is not None else None
+    current_market_price = market_data_agent.get_current_price(ticker=asset.ticker)
 
-    # Calculate metrics that depend on market data
     current_market_value = None
     financial_return_value = None
     financial_return_percent = None

@@ -1,13 +1,13 @@
 import yfinance as yf
 import time
 from typing import Dict, Any
+from decimal import Decimal
 
 # Simple in-memory cache to avoid excessive API calls
-# In a production system, this would be replaced by Redis, Memcached, etc.
 _cache: Dict[str, Dict[str, Any]] = {}
 CACHE_TTL_SECONDS = 60 * 15  # 15 minutes
 
-def get_current_price(ticker: str) -> float | None:
+def get_current_price(ticker: str) -> Decimal | None:
     """
     Fetches the current price for a given ticker, using a time-based cache.
     """
@@ -28,11 +28,12 @@ def get_current_price(ticker: str) -> float | None:
             return None
             
         price = hist['Close'].iloc[-1]
+        price_decimal = Decimal(str(price)).quantize(Decimal("0.01"))
         
         # Update cache
-        _cache[ticker] = {"price": price, "timestamp": current_time}
+        _cache[ticker] = {"price": price_decimal, "timestamp": current_time}
         
-        return price
+        return price_decimal
     except Exception:
         # Could be a network error or invalid ticker
         return None

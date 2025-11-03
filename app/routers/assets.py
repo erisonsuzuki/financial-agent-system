@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
-from app import crud, schemas
+from typing import List, Optional
+from app import crud, schemas, models
 from app.database import get_db
 from app.agents import market_data_agent, portfolio_analyzer_agent
 
@@ -18,8 +18,8 @@ def create_new_asset(asset: schemas.AssetCreate, db: Session = Depends(get_db)):
     return crud.create_asset(db=db, asset=asset)
 
 @router.get("/", response_model=List[schemas.Asset])
-def list_assets(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    assets = crud.get_assets(db, skip=skip, limit=limit)
+def list_assets(ticker: Optional[str] = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    assets = crud.get_assets(db, ticker=ticker, skip=skip, limit=limit)
     return assets
 
 @router.get("/{asset_id}", response_model=schemas.Asset)
@@ -58,3 +58,11 @@ def get_asset_analysis(ticker: str, db: Session = Depends(get_db)):
     
     analysis = portfolio_analyzer_agent.analyze_asset(db=db, asset=db_asset)
     return analysis
+
+@router.get("/{asset_id}/transactions", response_model=List[schemas.Transaction])
+def list_transactions_for_asset(asset_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    db_asset = crud.get_asset(db, asset_id=asset_id)
+    if db_asset is None:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    transactions = crud.get_transactions(db=db, asset_id=asset_id, skip=skip, limit=limit)
+    return transactions

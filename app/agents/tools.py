@@ -80,7 +80,7 @@ def list_transactions_for_ticker(ticker: Annotated[str, "The ticker symbol to se
     base_url = "http://app:8000"
     try:
         with httpx.Client() as client:
-            response = client.get(f"{base_url}/assets/{ticker}/transactions/", timeout=10.0)
+            response = client.get(f"{base_url}/assets/{ticker}/transactions", timeout=10.0)
             response.raise_for_status()
             return response.json()
     except httpx.HTTPStatusError as e:
