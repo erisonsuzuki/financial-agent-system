@@ -26,7 +26,11 @@ def analyze_asset(db: Session, asset: models.Asset) -> schemas.AssetAnalysis:
         total_invested = (total_quantity * average_price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     # Note: This is a simplification. A more complex model would consider the quantity at the time of each dividend payment.
-    total_dividends_received = sum(d.amount_per_share * total_quantity for d in dividends).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    dividends_total = sum(
+        ((Decimal(str(d.amount_per_share)) * total_quantity) for d in dividends),
+        Decimal("0.00"),
+    )
+    total_dividends_received = dividends_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     current_market_price = market_data_agent.get_current_price(ticker=asset.ticker)
 

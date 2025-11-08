@@ -8,16 +8,16 @@ The new modules are:
 2.  **PortfolioAnalyzerAgent:** Uses all available data to calculate metrics like average price, total invested, and financial return.
 
 ## 2. Consolidated Execution Checklist
--   [ ] Update `app/pyproject.toml` to add the `yfinance` dependency.
--   [ ] Update `app/schemas.py` to add the new `AssetPrice` and `AssetAnalysis` response models.
--   [ ] Create the new file `app/agents/market_data_agent.py` to handle price fetching.
--   [ ] Create the new file `app/agents/portfolio_analyzer_agent.py` to handle financial calculations.
--   [ ] Update `app/routers/assets.py` to add two new endpoints: `/{ticker}/price` and `/{ticker}/analysis`.
--   [ ] Create the new test file `tests/test_market_data_agent.py` to test the price fetching logic.
--   [ ] Create the new test file `tests/test_portfolio_analyzer_agent.py` to test the financial calculations.
--   [ ] Update `README.md` to document the new analysis endpoints.
--   [ ] Run `make up` to install the new dependency.
--   [ ] Run `make test` to ensure all new and existing tests pass.
+-   [x] Update `app/pyproject.toml` to add the `yfinance` dependency.
+-   [x] Update `app/schemas.py` to add the new `AssetPrice` and `AssetAnalysis` response models.
+-   [x] Create the new file `app/agents/market_data_agent.py` to handle price fetching.
+-   [x] Create the new file `app/agents/portfolio_analyzer_agent.py` to handle financial calculations.
+-   [x] Update `app/routers/assets.py` to add two new endpoints: `/{ticker}/price` and `/{ticker}/analysis`.
+-   [x] Create the new test file `tests/test_market_data_agent.py` to test the price fetching logic.
+-   [x] Create the new test file `tests/test_portfolio_analyzer_agent.py` to test the financial calculations.
+-   [x] Update `README.md` to document the new analysis endpoints.
+-   [x] Run `make up` to install the new dependency.
+-   [x] Run `make test` to ensure all new and existing tests pass.
 
 ---
 ## 3. File Contents

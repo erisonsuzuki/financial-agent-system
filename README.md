@@ -69,6 +69,8 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
     `make agent-register q="Register: 100 ITSA4 at R$10.50"`
   * **Management Agent (`management_agent`):**
     `make agent-manage q="Correct my last transaction for ITSA4, the price was R$10.75"`
+  * **Analysis Agent (`analysis_agent`):**
+    `make agent-analyze q="Where should I invest R$1000 this month?"`
 
 ### Data Management
 * `POST /assets/`: Create a new financial asset.
@@ -101,3 +103,4 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
 - `make test`: Run the unit test suite.
 - `make agent-register q="..."`: Send a query to the registration agent.
 - `make agent-manage q="..."`: Send a query to the management agent.
+- `make agent-analyze q="..."`: Send a query to the analysis agent.

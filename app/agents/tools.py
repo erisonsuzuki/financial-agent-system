@@ -147,3 +147,34 @@ def delete_asset_by_ticker(ticker: Annotated[str, "The ticker symbol of the asse
             return f"Successfully deleted asset {ticker} and all its records."
     except httpx.HTTPStatusError as e:
         return f"Error: {e.response.text}"
+
+@tool
+def get_full_portfolio_analysis() -> List[dict] | str:
+    """
+    Analyzes all assets in the portfolio and returns a list of their financial metrics.
+    This should be the primary tool to get an overview of the entire portfolio before making a recommendation.
+    """
+    base_url = "http://app:8000"
+    try:
+        with httpx.Client() as client:
+            # 1. Get all assets
+            asset_response = client.get(f"{base_url}/assets/", timeout=10.0)
+            asset_response.raise_for_status()
+            assets = asset_response.json()
+            if not assets:
+                return "Error: No assets found in the portfolio to analyze."
+            
+            # 2. For each asset, get its detailed analysis
+            full_analysis = []
+            for asset in assets:
+                ticker = asset.get("ticker")
+                if not ticker:
+                    continue
+                
+                analysis_response = client.get(f"{base_url}/assets/{ticker}/analysis", timeout=10.0)
+                analysis_response.raise_for_status() # Will raise for 404s etc.
+                full_analysis.append(analysis_response.json())
+            
+            return full_analysis
+    except (httpx.HTTPStatusError, IndexError, KeyError) as e:
+        return f"An unexpected error occurred during portfolio analysis: {str(e)}"
