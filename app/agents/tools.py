@@ -78,13 +78,21 @@ def list_transactions_for_ticker(ticker: Annotated[str, "The ticker symbol to se
     Lists all transactions for a given asset ticker. Useful for finding a specific transaction ID before updating it.
     """
     base_url = "http://app:8000"
+    ticker = _parse_ticker_from_input(ticker)
     try:
         with httpx.Client() as client:
-            response = client.get(f"{base_url}/assets/{ticker}/transactions", timeout=10.0)
+            asset_response = client.get(f"{base_url}/assets/?ticker={ticker}", timeout=10.0)
+            asset_response.raise_for_status()
+            assets = asset_response.json()
+            if not assets:
+                return f"Error: Asset with ticker {ticker} not found."
+            asset_id = assets[0]["id"]
+
+            response = client.get(f"{base_url}/assets/{asset_id}/transactions", timeout=10.0)
             response.raise_for_status()
             return response.json()
-    except httpx.HTTPStatusError as e:
-        return f"Error: {e.response.text}"
+    except (httpx.HTTPStatusError, KeyError, IndexError) as e:
+        return f"Error: {str(e)}"
 
 @tool
 def update_transaction_by_id(

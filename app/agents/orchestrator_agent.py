@@ -5,6 +5,7 @@ from langchain_community.chat_models import ChatOllama
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate
 from . import tools, config_loader
+from .callbacks import SafeStdOutCallbackHandler
 
 load_dotenv()
 
@@ -39,7 +40,12 @@ def create_agent_executor(agent_name: str):
     ])
     
     agent = create_tool_calling_agent(llm_with_tools, available_tools, prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=available_tools, verbose=True)
+    agent_executor = AgentExecutor(
+        agent=agent,
+        tools=available_tools,
+        verbose=True,
+        callbacks=[SafeStdOutCallbackHandler()],
+    )
     
     return agent_executor
 

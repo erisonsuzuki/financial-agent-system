@@ -9,8 +9,11 @@ def get_asset(db: Session, asset_id: int) -> models.Asset | None:
 def get_asset_by_ticker(db: Session, ticker: str) -> models.Asset | None:
     return db.query(models.Asset).filter(models.Asset.ticker == ticker).first()
 
-def get_assets(db: Session, skip: int = 0, limit: int = 100) -> list[models.Asset]:
-    return db.query(models.Asset).offset(skip).limit(limit).all()
+def get_assets(db: Session, ticker: Optional[str] = None, skip: int = 0, limit: int = 100) -> list[models.Asset]:
+    query = db.query(models.Asset)
+    if ticker is not None:
+        query = query.filter(models.Asset.ticker == ticker)
+    return query.offset(skip).limit(limit).all()
 
 def create_asset(db: Session, asset: schemas.AssetCreate) -> models.Asset:
     db_asset = models.Asset(**asset.model_dump())
