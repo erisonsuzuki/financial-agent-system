@@ -2,6 +2,20 @@ from sqlalchemy.orm import Session, joinedload
 from typing import Optional
 from . import models, schemas
 
+# --- User CRUD ---
+def get_user(db: Session, user_id: int) -> models.User | None:
+    return db.query(models.User).filter(models.User.id == user_id).first()
+
+def get_user_by_email(db: Session, email: str) -> models.User | None:
+    return db.query(models.User).filter(models.User.email == email).first()
+
+def create_user(db: Session, email: str, password_hash: str, google_sub: str | None = None) -> models.User:
+    db_user = models.User(email=email, password_hash=password_hash, google_sub=google_sub)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
 # --- Asset CRUD ---
 def get_asset(db: Session, asset_id: int) -> models.Asset | None:
     return db.query(models.Asset).filter(models.Asset.id == asset_id).first()
@@ -103,3 +117,20 @@ def delete_dividend(db: Session, dividend_id: int) -> models.Dividend:
 
 def get_dividends_for_asset(db: Session, asset_id: int, skip: int = 0, limit: int = 100) -> list[models.Dividend]:
     return db.query(models.Dividend).filter(models.Dividend.asset_id == asset_id).offset(skip).limit(limit).all()
+
+# --- Agent Action CRUD ---
+def create_agent_action(db: Session, user_id: int, payload: schemas.AgentActionCreate) -> models.AgentAction:
+    db_action = models.AgentAction(user_id=user_id, **payload.model_dump())
+    db.add(db_action)
+    db.commit()
+    db.refresh(db_action)
+    return db_action
+
+def get_agent_actions(db: Session, user_id: int, limit: int = 100) -> list[models.AgentAction]:
+    return (
+        db.query(models.AgentAction)
+        .filter(models.AgentAction.user_id == user_id)
+        .order_by(models.AgentAction.created_at.desc())
+        .limit(limit)
+        .all()
+    )

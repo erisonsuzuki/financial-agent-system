@@ -1,7 +1,10 @@
+import os
 import respx
 import httpx
 from decimal import Decimal
 from app.agents.tools import register_asset_position
+
+BASE_URL = os.getenv("INTERNAL_API_URL", "http://app:8000")
 
 @respx.mock
 def test_register_asset_position_success():
@@ -10,15 +13,15 @@ def test_register_asset_position_success():
     asset_id = 1
     
     # 1. Mock the POST to create the asset
-    respx.post("http://app:8000/assets/").mock(return_value=httpx.Response(201))
+    respx.post(f"{BASE_URL}/assets/").mock(return_value=httpx.Response(201))
     
     # 2. Mock the GET to find the asset's ID
-    respx.get(f"http://app:8000/assets/?ticker={ticker}").mock(
+    respx.get(f"{BASE_URL}/assets/?ticker={ticker}").mock(
         return_value=httpx.Response(200, json=[{"id": asset_id, "ticker": ticker}])
     )
     
     # 3. Mock the POST to create the transaction
-    respx.post("http://app:8000/transactions/").mock(return_value=httpx.Response(201))
+    respx.post(f"{BASE_URL}/transactions/").mock(return_value=httpx.Response(201))
 
     # Act
     result = register_asset_position.invoke({
@@ -38,15 +41,15 @@ def test_register_asset_position_handles_existing_asset():
     asset_id = 2
 
     # 1. Mock the POST to create the asset (simulating it already exists)
-    respx.post("http://app:8000/assets/").mock(return_value=httpx.Response(400))
+    respx.post(f"{BASE_URL}/assets/").mock(return_value=httpx.Response(400))
     
     # 2. Mock the GET to find the asset's ID
-    respx.get(f"http://app:8000/assets/?ticker={ticker}").mock(
+    respx.get(f"{BASE_URL}/assets/?ticker={ticker}").mock(
         return_value=httpx.Response(200, json=[{"id": asset_id, "ticker": ticker}])
     )
 
     # 3. Mock the POST to create the transaction
-    respx.post("http://app:8000/transactions/").mock(return_value=httpx.Response(201))
+    respx.post(f"{BASE_URL}/transactions/").mock(return_value=httpx.Response(201))
 
     # Act
     result = register_asset_position.invoke({

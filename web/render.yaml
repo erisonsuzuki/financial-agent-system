@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: agent-ui
+    env: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: FASTAPI_BASE_URL
+        value: https://financial-agent-api.onrender.com

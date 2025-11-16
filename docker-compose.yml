@@ -1,5 +1,5 @@
 services:
-  app:
+  api:
     build:
       context: .
       dockerfile: app/Dockerfile
@@ -15,6 +15,19 @@ services:
       - .env
     environment:
       - PYTHONPATH=/code
+      - INTERNAL_API_URL=http://localhost:8000
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      - FASTAPI_BASE_URL=http://api:8000
 
   db:
     image: postgres:15-alpine

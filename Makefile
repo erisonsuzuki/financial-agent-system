@@ -8,19 +8,19 @@ clean:
 	docker compose down --volumes --rmi all
 
 update-deps:
-	docker compose exec --workdir /code/app app poetry update
+	docker compose exec --workdir /code/app api poetry update
 	
 logs:
 	docker compose logs -f
 
 shell:
-	docker compose exec app bash
+	docker compose exec api bash
 
 db-shell:
 	docker compose exec db psql -U user -d financialdb
 
 test:
-	docker compose exec app pytest
+	docker compose exec api pytest
 
 # Send a query to the registration agent. Usage: make agent-query q="your question"
 agent-register:

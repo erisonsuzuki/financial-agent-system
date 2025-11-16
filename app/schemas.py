@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from app.models import AssetType
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 # --- Asset Schemas ---
@@ -77,3 +77,27 @@ class AssetAnalysis(BaseModel):
     financial_return_value: Decimal | None
     financial_return_percent: Decimal | None
     total_dividends_received: Decimal
+
+# --- Agent Action Schemas ---
+class AgentActionCreate(BaseModel):
+    agent_name: str
+    question: str
+    tool_calls: dict | None = None
+    response: str
+
+class AgentAction(AgentActionCreate):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class AgentQuery(BaseModel):
+    question: str
+
+class AgentResponse(BaseModel):
+    answer: str
+
+class AgentResponseWithMetadata(BaseModel):
+    agent: str
+    confidence: float | None = None
+    answer: str
+    routing_metadata: dict | None = None

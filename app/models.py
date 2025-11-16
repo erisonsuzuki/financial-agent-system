@@ -1,5 +1,18 @@
-from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, Enum as SQLAlchemyEnum, Numeric
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Float,
+    Date,
+    ForeignKey,
+    Enum as SQLAlchemyEnum,
+    Numeric,
+    Text,
+    DateTime,
+    JSON,
+)
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from app.database import Base
 import enum
 
@@ -33,3 +46,23 @@ class Dividend(Base):
     amount_per_share = Column(Numeric(10, 4), nullable=False)
     payment_date = Column(Date, nullable=False)
     asset = relationship("Asset", back_populates="dividends")
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    google_sub = Column(String, unique=True, nullable=True)
+    actions = relationship("AgentAction", back_populates="user")
+
+class AgentAction(Base):
+    __tablename__ = "agent_actions"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    agent_name = Column(String, nullable=False)
+    question = Column(Text, nullable=False)
+    tool_calls = Column(JSON, nullable=True)
+    response = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="actions")

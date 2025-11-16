@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: financial-agent-api
+    env: docker
+    plan: starter
+    dockerfilePath: app/Dockerfile
+    envVars:
+      - key: POSTGRES_USER
+        value: user
+      - key: POSTGRES_PASSWORD
+        value: password
+      - key: POSTGRES_DB
+        value: financialdb
+      - key: LLM_PROVIDER
+        value: google
+      - key: GOOGLE_MODEL
+        value: gemini-1.5-pro
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: FASTAPI_BASE_URL
+        value: https://financial-agent-api.onrender.com
+    healthCheckPath: /health

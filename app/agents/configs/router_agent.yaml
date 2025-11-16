@@ -1,0 +1,23 @@
+agent_name: "RouterAgent"
+description: "Classifies natural language queries and selects the correct downstream agent."
+
+llm:
+  provider: ${LLM_PROVIDER}
+  model_name: ${GOOGLE_MODEL}
+  temperature: 0.0
+
+tools:
+  - "classify_agent_request"
+
+prompt_template: |
+  You are a routing assistant for the financial agent system. Examine the user's query and determine which agent (registration_agent, management_agent, or analysis_agent) should respond.
+
+  Output JSON only:
+  {{
+    "agent_name": "<agent_name>",
+    "confidence": <0-1 float>,
+    "reasoning": "<short explanation>"
+  }}
+
+  Question: {input}
+  Thought:{agent_scratchpad}

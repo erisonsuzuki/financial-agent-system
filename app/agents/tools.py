@@ -1,8 +1,12 @@
-from langchain.tools import tool
-import httpx
+import os
 from datetime import date
 from decimal import Decimal
 from typing import Annotated, Optional, List, Any
+
+import httpx
+from langchain.tools import tool
+
+BASE_API_URL = os.getenv("INTERNAL_API_URL", "http://app:8000")
 
 def _parse_ticker_from_input(ticker_input: Any) -> str:
     """
@@ -21,7 +25,7 @@ def register_asset_position(
 ) -> dict:
     """Registers a user's complete position for a single asset."""
     ticker = _parse_ticker_from_input(ticker)
-    base_url = "http://app:8000"
+    base_url = BASE_API_URL
     
     asset_payload = {"ticker": ticker, "name": ticker, "asset_type": "STOCK"}
     transaction_payload = {
@@ -63,7 +67,7 @@ def list_all_transactions(limit: Annotated[Optional[int], "The maximum number of
     Lists recent transactions across all assets in the portfolio.
     Useful for general questions like 'what was my last transaction?'.
     """
-    base_url = "http://app:8000"
+    base_url = BASE_API_URL
     try:
         with httpx.Client() as client:
             response = client.get(f"{base_url}/transactions/?limit={limit}", timeout=10.0)
@@ -77,7 +81,7 @@ def list_transactions_for_ticker(ticker: Annotated[str, "The ticker symbol to se
     """
     Lists all transactions for a given asset ticker. Useful for finding a specific transaction ID before updating it.
     """
-    base_url = "http://app:8000"
+    base_url = BASE_API_URL
     ticker = _parse_ticker_from_input(ticker)
     try:
         with httpx.Client() as client:
@@ -104,7 +108,7 @@ def update_transaction_by_id(
     """
     Updates one or more fields of a specific transaction identified by its ID.
     """
-    base_url = "http://app:8000"
+    base_url = BASE_API_URL
     update_payload = {}
     if new_quantity is not None:
         update_payload["quantity"] = new_quantity
@@ -129,7 +133,7 @@ def delete_asset_by_ticker(ticker: Annotated[str, "The ticker symbol of the asse
     """
     Deletes an asset and all its associated transactions and dividends from the portfolio.
     """
-    base_url = "http://app:8000"
+    base_url = BASE_API_URL
     # This tool is smarter: it finds the asset ID first, then calls the DELETE endpoint.
     try:
         with httpx.Client() as client:
@@ -154,7 +158,7 @@ def get_full_portfolio_analysis() -> List[dict] | str:
     Analyzes all assets in the portfolio and returns a list of their financial metrics.
     This should be the primary tool to get an overview of the entire portfolio before making a recommendation.
     """
-    base_url = "http://app:8000"
+    base_url = BASE_API_URL
     try:
         with httpx.Client() as client:
             # 1. Get all assets
@@ -178,3 +182,42 @@ def get_full_portfolio_analysis() -> List[dict] | str:
             return full_analysis
     except (httpx.HTTPStatusError, IndexError, KeyError) as e:
         return f"An unexpected error occurred during portfolio analysis: {str(e)}"
+
+@tool
+def classify_agent_request(
+    question: Annotated[str, "The original natural-language request from the user."]
+) -> dict:
+    """
+    Classifies the user request into registration, management, or analysis based on keyword heuristics.
+    Acts as a backup signal for the router agent when the LLM needs structured hints.
+    """
+    normalized = question.lower()
+
+    keywords = {
+        "registration_agent": ["register", "add position", "new asset", "compr", "buy"],
+        "management_agent": ["update", "correct", "sell", "delete", "adjust", "fix"],
+        "analysis_agent": ["analysis", "invest", "recommendation", "where should", "analyze"],
+    }
+
+    scores = {agent: 0 for agent in keywords}
+    for agent, tokens in keywords.items():
+        for token in tokens:
+            if token in normalized:
+                scores[agent] += 1
+
+    best_agent = max(scores, key=scores.get)
+    best_score = scores[best_agent]
+    total_hits = sum(scores.values()) or 1
+    confidence = min(1.0, best_score / total_hits) if best_score else 0.33
+
+    reasoning = (
+        f"Matched keywords for {best_agent}: {best_score} hit(s)."
+        if best_score
+        else "No strong keyword matches; defaulting to analysis_agent."
+    )
+
+    return {
+        "agent_name": best_agent if best_score else "analysis_agent",
+        "confidence": round(confidence, 2),
+        "reasoning": reasoning,
+    }

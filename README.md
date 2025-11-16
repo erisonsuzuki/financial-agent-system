@@ -38,7 +38,7 @@ graph TD
 
 ## Tech Stack
 - **Language:** Python 3.11+
-- **Framework:** FastAPI
+- **Frameworks:** FastAPI (backend) + Next.js 15 (App Router frontend)
 - **Database:** PostgreSQL
 - **Containerization:** Docker
 - **Dependency Management:** Poetry
@@ -56,12 +56,21 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
 * `GOOGLE_MODEL`: The Gemini model to use (e.g., `gemini-1.5-flash`, `gemini-1.5-pro`).
 * `OLLAMA_BASE_URL`: The URL for your local Ollama server (e.g., `http://host.docker.internal:11434`).
 * `OLLAMA_MODEL`: The name of the Ollama model to use (e.g., `llama3`).
+* `JWT_SECRET_KEY`: Secret used to sign API access tokens.
+* `FASTAPI_BASE_URL`: (optional for standalone web deployments) Public URL where the FastAPI service can be reached.
+* `INTERNAL_API_URL`: Base URL that agents use when they call the FastAPI service (defaults to `http://app:8000`; set to `http://localhost:8000` when running outside Docker).
 
 ### Setup and Running
-1.  **Build and Run the Application:** Use `make up`. The API will be available at `http://localhost:8000`.
+1.  **Build and Run the Application:** Use `make up`. Docker Compose builds and starts the API (`http://localhost:8000`), the Web UI (`http://localhost:3000`), and PostgreSQL with one command.
 2.  **Run Tests (Recommended):** Verify the setup with `make test`.
 
-## API Endpoints & Agent Interaction
+## Web UI & API Endpoints
+
+### Web Interface
+- `http://localhost:3000`: Next.js dashboard with authentication, chat box, and action log.
+- Requires the backend to run at `http://localhost:8000` (automatically configured when using `make up`). When hosting separately, set `FASTAPI_BASE_URL` for the web app so it knows where to reach the API.
+
+### API Endpoints & Agent Interaction
 
 ### AI Agent
 * `POST /agent/query/{agent_name}`: Send a natural language query to a specific AI agent.

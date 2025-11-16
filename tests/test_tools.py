@@ -1,6 +1,9 @@
+import os
 import respx
 import httpx
 from app.agents.tools import list_transactions_for_ticker
+
+BASE_URL = os.getenv("INTERNAL_API_URL", "http://app:8000")
 
 @respx.mock
 def test_list_transactions_for_ticker_success():
@@ -19,8 +22,8 @@ def test_list_transactions_for_ticker_success():
         ]
     }
 
-    respx.get(f"http://app:8000/assets/?ticker={ticker}").mock(return_value=httpx.Response(200, json=asset_response["json"]))
-    respx.get(f"http://app:8000/assets/{asset_id}/transactions").mock(return_value=httpx.Response(200, json=transactions_response["json"]))
+    respx.get(f"{BASE_URL}/assets/?ticker={ticker}").mock(return_value=httpx.Response(200, json=asset_response["json"]))
+    respx.get(f"{BASE_URL}/assets/{asset_id}/transactions").mock(return_value=httpx.Response(200, json=transactions_response["json"]))
 
     # Act
     result = list_transactions_for_ticker.invoke({"ticker": ticker})

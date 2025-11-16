@@ -8,7 +8,7 @@ setup_logging()
 
 from app import models
 from app.database import engine, SessionLocal
-from app.routers import assets, transactions, dividends, agent
+from app.routers import assets, transactions, dividends, agent, agent_actions, auth
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -22,6 +22,8 @@ app.include_router(assets.router)
 app.include_router(transactions.router)
 app.include_router(dividends.router)
 app.include_router(agent.router)
+app.include_router(agent_actions.router)
+app.include_router(auth.router)
 
 @app.get("/")
 def read_root():
