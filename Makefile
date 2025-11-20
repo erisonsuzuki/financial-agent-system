@@ -22,6 +22,19 @@ db-shell:
 test:
 	docker compose exec api pytest
 
+# Web frontend helpers (run from repo root)
+web-install:
+	npm install --prefix web
+
+web-build:
+	npm run build --prefix web
+
+web-lint:
+	npm run lint --prefix web
+
+web-dev:
+	npm run dev --prefix web
+
 # Send a query to the registration agent. Usage: make agent-query q="your question"
 agent-register:
 	@curl -s -X POST http://localhost:8000/agent/query/registration_agent \

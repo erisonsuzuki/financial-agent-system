@@ -9,3 +9,7 @@ __pycache__/
 .dockerignore
 
 web/node_modules
+web/.next
+web/.turbo
+web/.eslintcache
+.pytest_cache/

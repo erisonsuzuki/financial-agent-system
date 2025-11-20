@@ -11,12 +11,12 @@ export default function ActionLogTable({ entries }: Props) {
 
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-800">
-      <table className="min-w-full text-sm">
+      <table className="min-w-full table-fixed text-sm">
         <thead className="bg-slate-900 text-left uppercase text-slate-400">
           <tr>
-            <th className="px-4 py-3">Timestamp</th>
-            <th className="px-4 py-3">Agent</th>
-            <th className="px-4 py-3">Question</th>
+            <th className="px-4 py-3 w-40">Timestamp</th>
+            <th className="px-4 py-3 w-32">Agent</th>
+            <th className="px-4 py-3 w-80">Question</th>
             <th className="px-4 py-3">Response</th>
           </tr>
         </thead>
@@ -26,17 +26,17 @@ export default function ActionLogTable({ entries }: Props) {
               <td className="px-4 py-3 text-slate-400">
                 {new Date(entry.created_at).toLocaleString()}
               </td>
-              <td className="px-4 py-3 font-semibold text-sky-300">{entry.agent_name}</td>
-              <td className="px-4 py-3 text-slate-200 max-w-sm">
-                <p>{entry.question}</p>
+              <td className="px-4 py-3 font-semibold text-sky-300 break-words">{entry.agent_name}</td>
+              <td className="px-4 py-3 text-slate-200 max-w-xs">
+                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{entry.question}</p>
                 {entry.tool_calls && (
-                  <pre className="mt-2 rounded bg-slate-950 p-2 text-xs text-slate-400">
+                  <pre className="mt-2 rounded bg-slate-950 p-2 text-xs text-slate-400 overflow-x-auto">
 {JSON.stringify(entry.tool_calls, null, 2)}
                   </pre>
                 )}
               </td>
               <td className="px-4 py-3 text-slate-200 max-w-sm">
-                <p>{entry.response}</p>
+                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{entry.response}</p>
               </td>
             </tr>
           ))}
