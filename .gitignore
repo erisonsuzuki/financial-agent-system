@@ -13,3 +13,4 @@ web/.next
 web/.turbo
 web/.eslintcache
 .pytest_cache/
+web/.vitest-cache

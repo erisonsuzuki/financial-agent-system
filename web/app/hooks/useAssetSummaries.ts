@@ -10,11 +10,11 @@ export type AssetSummary = {
   averagePrice: number;
 };
 
-export function useAssetSummaries() {
+export function useAssetSummaries(isAuthenticated: boolean) {
   return useQuery({
-    queryKey: ["assets-summary"],
+    queryKey: ["assets-summary", isAuthenticated ? "auth" : "guest"],
     queryFn: async () => {
-      const res = await fetch("/api/assets-summary");
+      const res = await fetch("/api/assets-summary", { cache: "no-store", credentials: "include" });
       if (res.status === 401) {
         throw new Error("Session expired");
       }

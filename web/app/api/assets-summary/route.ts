@@ -1,7 +1,4 @@
-"use server";
-
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { fastapiFetch } from "@/app/lib/fas-api";
 
 type Asset = { id: number; ticker: string; name: string };
@@ -12,10 +9,14 @@ type AssetSummary = {
   ticker: string;
   units: number;
   averagePrice: number;
+  error?: string;
 };
 
-export async function GET(_request: NextRequest) {
-  const token = (await cookies()).get("fas_token")?.value;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+export async function GET(request: NextRequest) {
+  const token = request.cookies.get("fas_token")?.value;
   if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -31,16 +32,28 @@ export async function GET(_request: NextRequest) {
 
     const enriched = await Promise.all(
       assets.map(async (asset): Promise<AssetSummary> => {
-        const analysis = await fastapiFetch<AssetAnalysis>(`/assets/${asset.ticker}/analysis`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        return {
-          id: asset.id,
-          name: asset.name,
-          ticker: asset.ticker,
-          units: analysis.total_quantity,
-          averagePrice: Number(analysis.average_price),
-        };
+        try {
+          const analysis = await fastapiFetch<AssetAnalysis>(`/assets/${asset.ticker}/analysis`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          return {
+            id: asset.id,
+            name: asset.name,
+            ticker: asset.ticker,
+            units: analysis.total_quantity,
+            averagePrice: Number(analysis.average_price),
+          };
+        } catch (error) {
+          console.error(`Failed to fetch analysis for ${asset.ticker}:`, error);
+          return {
+            id: asset.id,
+            name: asset.name,
+            ticker: asset.ticker,
+            units: 0,
+            averagePrice: 0,
+            error: "analysis_unavailable",
+          };
+        }
       })
     );
 

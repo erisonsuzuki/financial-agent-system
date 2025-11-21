@@ -6,9 +6,10 @@ interface Props {
   assets: AssetSummary[] | undefined;
   loading: boolean;
   error: Error | null;
+  hideAmounts?: boolean;
 }
 
-export default function AssetSidebar({ assets, loading, error }: Props) {
+export default function AssetSidebar({ assets, loading, error, hideAmounts = false }: Props) {
   if (loading) {
     return <div className="rounded-xl border border-slate-800 p-4 text-sm text-slate-400">Loading assets…</div>;
   }
@@ -41,9 +42,9 @@ export default function AssetSidebar({ assets, loading, error }: Props) {
           <li key={asset.id} className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="font-semibold text-slate-100 truncate">{asset.name}</p>
-              <p className="text-xs text-slate-400">{asset.units} units</p>
+              {!hideAmounts && <p className="text-xs text-slate-400">{asset.units} units</p>}
             </div>
-            <p className="text-emerald-300 font-mono text-sm">${asset.averagePrice.toFixed(2)}</p>
+            {!hideAmounts && <p className="text-emerald-300 font-mono text-sm">${asset.averagePrice.toFixed(2)}</p>}
           </li>
         ))}
       </ul>

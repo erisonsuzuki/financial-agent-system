@@ -14,7 +14,7 @@ services:
       - key: LLM_PROVIDER
         value: google
       - key: GOOGLE_MODEL
-        value: gemini-1.5-pro
+        value: gemini-2.5-flash
       - key: JWT_SECRET_KEY
         sync: false
       - key: FASTAPI_BASE_URL

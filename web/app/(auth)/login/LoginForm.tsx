@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function LoginForm() {
+interface Props {
+  onSuccess?: () => void | Promise<void>;
+}
+
+export default function LoginForm({ onSuccess }: Props) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -16,6 +20,7 @@ export default function LoginForm() {
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
+        credentials: "include",
         body: JSON.stringify({
           email: formData.get("email"),
           password: formData.get("password"),
@@ -28,7 +33,15 @@ export default function LoginForm() {
       }
 
       await res.json();
-      router.push("/dashboard");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("fas-auth-changed"));
+      }
+
+      if (onSuccess) {
+        await onSuccess();
+      } else {
+        router.push("/dashboard");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unexpected error");
     } finally {

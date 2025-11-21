@@ -22,15 +22,11 @@ db-shell:
 test:
 	docker compose exec api pytest
 
-# Web frontend helpers (run from repo root)
-web-install:
-	npm install --prefix web
+web-test:
+	docker compose run --rm -e NODE_ENV=development -v $(PWD)/web:/app -w /app web sh -lc "npm install --include=dev && npm test"
 
-web-build:
-	npm run build --prefix web
-
-web-lint:
-	npm run lint --prefix web
+web-audit:
+	docker compose run --rm -e NODE_ENV=development -v $(PWD)/web:/app -w /app web sh -lc "npm install --include=dev && npm audit fix --force"
 
 web-dev:
 	npm run dev --prefix web
