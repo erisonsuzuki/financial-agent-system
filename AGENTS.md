@@ -1,47 +1,140 @@
 # AGENTS.md
 
-## Dev environment tips
-- Use Docker Compose to run everything: `make up` (builds FastAPI API, Next.js web, Postgres). Stop/clean with `make down` / `make clean`. Logs: `make logs`. Shells: `make shell` (api), `make db-shell` (psql). Compose file: `docker-compose.yml`.
-- Backend (FastAPI) lives in `app/`; entrypoint and dependencies via Poetry. Local tests: `make test` (runs `pytest` inside the api container). Dev server is automatically started by Compose; API served at `http://localhost:8000`.
-- Frontend (Next.js App Router) lives in `web/`. Convenience Make targets: `make web-install`, `make web-dev`, `make web-build`, `make web-lint`. When running under Compose, web is served at `http://localhost:3000` and points to the API via `FASTAPI_BASE_URL` env.
-- Agent configs are YAML in `app/agents/configs/`; orchestrator and tools in `app/agents/`. Router endpoints for agents in `app/routers/agent.py`. Web chat/dashboard in `web/app/dashboard/`.
-- Key env vars: copy `.env.sample` → `.env`. API expects Postgres creds and LLM settings (`LLM_PROVIDER`, `LLM_FALLBACK_PROVIDER`, `GROQ_MODEL`, `GROQ_API_KEY`, `NVIDIA_MODEL`, `NVIDIA_API_KEY`, `JWT_SECRET_KEY`, `INTERNAL_API_URL`). Web honors `FASTAPI_BASE_URL` (set to `http://api:8000` in Compose). Render deploy uses `render.yaml`.
-- Makefile shortcuts for agent calls: `make agent-register q="..."`, `make agent-manage q="..."`, `make agent-analyze q="..."`.
+## Purpose
+- This file guides agentic coding tools working in this repo.
+- Prefer existing conventions over introducing new ones.
+- Keep instructions practical and repository-specific.
 
-## Testing instructions
-- API tests: `make test` (runs `pytest` in the api container). Tests use in-memory SQLite (see `tests/conftest.py`); mock external services (e.g., market data) as needed.
-- Frontend lint: `make web-lint` (currently `next lint`; note deprecation warning for Next 16—switch to `eslint .` when upgrading).
-- Frontend build check: `make web-build`. Dev server: `make web-dev`.
-- Run specific API tests: `docker compose exec api pytest tests/test_<name>.py -k "<filter>"`.
-- Add/update tests when modifying tools, routers, or agent configs. Mock external calls (HTTP, LLM) to keep tests hermetic.
-- Debugging tips: reproduce within the container (`docker compose exec api bash`), check env (`printenv`), and verify pytest uses the in-memory DB (not Postgres).
+## Repo map
+- Backend (FastAPI) lives in `app/`; Poetry manages dependencies in `app/pyproject.toml`.
+- Frontend (Next.js App Router) lives in `web/`.
+- Agent configs are YAML in `app/agents/configs/`.
+- Agent orchestration is in `app/agents/orchestrator_agent.py` and tools in `app/agents/tools.py`.
+- Routers are in `app/routers/` (agent endpoints in `app/routers/agent.py`).
+- Web dashboard and components are in `web/app/`.
 
-## PR instructions
-- Ensure `make test` (API) and `make web-lint` / `make web-build` (web) pass before submitting.
-- Keep changes aligned with the agent architecture: update YAML configs in `app/agents/configs/` and tool bindings as needed; adjust FastAPI routers and tests accordingly.
-- Add/adjust README or docs in `docs/` when altering workflows, env vars, or endpoints.
-- Document any new env vars and ensure `.env.sample` stays in sync.
+## Build, lint, test commands
+- Full stack (Docker Compose): `make up` (builds API, Web, Postgres).
+- Stop/clean containers: `make down` / `make clean`.
+- Logs: `make logs` (or `docker compose logs -f api` / `docker compose logs -f web`).
+- API shell: `make shell` (container bash).
+- DB shell: `make db-shell` (psql).
+- Update API deps: `make update-deps` (runs `poetry update` in container).
+- Audit deps: `make audit` (runs `pip-audit` and `npm audit`).
 
-### Docker & Containerization
-- Build/start all services: `make up`. Stop: `make down`. Full cleanup (containers/images/volumes): `make clean`.
-- Web and API images built from `web/Dockerfile` and `app/Dockerfile`. Volumes mount `./app` and `./tests` into the api container for live reload; Postgres data persisted via `postgres_data` volume.
-- Ports: API `8000:8000`, Web `3000:3000`, Postgres internal (no host port). Health check on Postgres via `pg_isready`.
-- Logs: `make logs` or `docker compose logs -f api` / `docker compose logs -f web`. Shell: `make shell` (api), `make db-shell` (psql).
+### API (FastAPI)
+- Run tests in container: `make test` (runs `docker compose exec api pytest`).
+- Run a single test file: `docker compose exec api pytest tests/test_<name>.py`.
+- Run a single test by name: `docker compose exec api pytest tests/test_<name>.py -k "<filter>"`.
+- Debugging: `docker compose exec api bash`, then run `pytest` directly.
 
-### Deployment
-- Render config: `render.yaml` (Docker deploy for FastAPI). Ensure env vars (`POSTGRES_*`, `LLM_PROVIDER`, `LLM_FALLBACK_PROVIDER`, `GROQ_MODEL`, `NVIDIA_MODEL`, `JWT_SECRET_KEY`, `FASTAPI_BASE_URL`) are set in Render dashboard. Health check path: `/health`.
-- Next.js image served via `web/Dockerfile`; set `FASTAPI_BASE_URL` to the API’s public URL when web is deployed separately.
+### Web (Next.js)
+- Dev server: `npm run dev --prefix web` (or `make web-dev`).
+- Lint: `npm run lint --prefix web` (Next ESLint rules).
+- Build: `npm run build --prefix web`.
+- Tests: `npm run test --prefix web` (Vitest run).
+- Single test file: `npm run test --prefix web -- path/to/test.spec.tsx`.
+- Single test by name: `npm run test --prefix web -- -t "test name"`.
 
-### Project Overview
-- Backend: FastAPI with agent orchestration (LangChain). Agents configured via YAML in `app/agents/configs/`; orchestrator in `app/agents/orchestrator_agent.py`; tools in `app/agents/tools.py`; routers in `app/routers/`.
-- Frontend: Next.js 15 (App Router) in `web/app/`; React Query for data fetching; dashboard at `web/app/dashboard/` with chat input (`web/app/components/ChatInput.tsx`) and action log (`web/app/components/ActionLogTable.tsx`). Asset sidebar and summaries via `web/app/api/assets-summary/route.ts` and `web/app/hooks/useAssetSummaries.ts`.
-- Database: PostgreSQL (runtime), SQLite in-memory for tests. Models/schemas in `app/models.py` and `app/schemas.py`.
+## Agent command shortcuts
+- Registration agent: `make agent-register q="..."`.
+- Management agent: `make agent-manage q="..."`.
+- Analysis agent: `make agent-analyze q="..."`.
+- Debug raw agent output: `make agent-debug q="..."`.
 
-### Security Considerations
-- JWT secret (`JWT_SECRET_KEY`) required by FastAPI auth; keep it out of source control. Tokens stored as HTTP-only cookies on the web side.
-- LLM provider keys (`GROQ_API_KEY`, `NVIDIA_API_KEY`) must be set per environment; do not commit secrets.
-- Internal agent calls use `INTERNAL_API_URL` (defaults to `http://app:8000` in Docker). If you enforce auth on assets/transactions later, ensure tools send proper Authorization headers.
+## Environment and secrets
+- API expects: `LLM_PROVIDER`, `LLM_FALLBACK_PROVIDER`, `GROQ_MODEL`, `GROQ_API_KEY`, `NVIDIA_MODEL`, `NVIDIA_API_KEY`, `JWT_SECRET_KEY`, `INTERNAL_API_URL`, and Postgres creds.
+- Web uses `FASTAPI_BASE_URL` to point to the API.
+- Never commit secrets or real tokens.
 
-### Code Style Guidelines
-- Python: follow FastAPI conventions; tests with pytest. No specific formatter config present—use standard tooling as needed.
-- JS/TS: ESLint via Next.js config; TypeScript config in `web/tsconfig.json`; Tailwind config in `web/tailwind.config.ts`.
+## Docker notes
+- Compose file: `docker-compose.yml`.
+- Containers: `api`, `web`, `db`.
+- Ports: API `8000:8000`, Web `3000:3000`, Postgres internal only.
+- Postgres data persists via `postgres_data` volume.
+- Health checks: API `/health`, Postgres `pg_isready`.
+
+## Local URLs
+- API: `http://localhost:8000`.
+- Web: `http://localhost:3000`.
+
+## Change checklist
+- Update docs in `docs/` when workflows, env vars, or endpoints change.
+- Keep `.env.sample` in sync with new variables.
+- Add/adjust tests when modifying tools, routers, or agent configs.
+- Mock external services to keep tests hermetic.
+
+## Code style guidelines
+
+### Python (FastAPI, SQLAlchemy, Pydantic)
+- Formatting: 4-space indents; keep lines readable; no formatter enforced.
+- Imports: standard library, third-party, then local `app.*` imports.
+- Naming: classes in `PascalCase`, functions/variables in `snake_case`, constants in `UPPER_SNAKE_CASE`.
+- Typing: use explicit types for public functions; prefer `str | None` unions; keep return types clear.
+- Error handling: raise `HTTPException` with explicit `status_code`; avoid bare `except` unless wrapping with context.
+- JSON/IO: validate or guard against malformed inputs; default safely if parsing fails (see router JSON parsing pattern).
+- DB models: keep SQLAlchemy models in `app/models.py`; use `relationship` and `back_populates` consistently.
+- Schemas: use Pydantic `BaseModel` with `ConfigDict(from_attributes=True)` when mapping ORM objects.
+- Logging: use module `logger` instead of print for service code.
+
+### API patterns
+- Router functions should be small and delegate heavy logic to `crud` or service modules.
+- Favor dependency injection via `Depends` for DB sessions and authentication.
+- Keep response models explicit in route decorators.
+- Validate external calls; mock external services in tests.
+
+### Data access and models
+- Runtime DB is Postgres; tests use in-memory SQLite.
+- SQLAlchemy models live in `app/models.py`.
+- Pydantic schemas live in `app/schemas.py`.
+- CRUD helpers live in `app/crud.py` (keep DB logic out of routers).
+
+### Tests (pytest)
+- Tests live under `tests/`.
+- Tests use in-memory SQLite; avoid relying on Postgres in tests.
+- Mock external services (HTTP, LLM) with `respx` or fixtures.
+- Prefer clear Arrange/Act/Assert blocks; keep test names descriptive.
+
+### TypeScript / React / Next.js
+- Formatting: 2-space indent, semicolons, double quotes (match existing files).
+- Imports: React/Next first, third-party next, then local; use `import type` for type-only imports.
+- Paths: use `@/` alias per `web/tsconfig.json` when importing from `web/app`.
+- Naming: components in `PascalCase`, hooks in `useSomething`, local vars in `camelCase`.
+- Types: use `interface` for props, `type` for data shapes; keep exported types explicit.
+- Client components: include `"use client"` at the top when using hooks/state.
+- Data fetching: guard `res.ok` and handle `401` explicitly; return typed JSON.
+- Error handling: throw user-friendly errors from hooks; render fallback UI for empty states.
+
+### Web app structure
+- App Router pages and routes live in `web/app/`.
+- API routes live under `web/app/api/`.
+- Shared UI components live in `web/app/components/`.
+- Data hooks live in `web/app/hooks/`.
+- Shared types live in `web/app/types/`.
+
+### React Query usage
+- Use `useQuery` for fetches; key on auth state where relevant.
+- Include `credentials: "include"` when calling API routes that use cookies.
+- Prefer `cache: "no-store"` for API routes that should not be cached.
+- Provide friendly error messages for empty or error states.
+
+### Styling (Tailwind)
+- Keep Tailwind class lists readable; prefer semantic grouping (layout, spacing, color, state).
+- Use existing color palette (slate, emerald, sky) unless a change is intentional.
+- Avoid inline styles unless necessary.
+
+## Deployment notes
+- Render config: `render.yaml` (Docker deploy for API).
+- Health check path: `/health`.
+- If adding env vars, update `.env.sample` and docs.
+
+## Repository hygiene
+- Do not reformat entire files without reason; match surrounding style.
+- Keep diffs minimal and scoped to the request.
+- Avoid committing `.env` or secrets.
+
+## Security checklist
+- Do not log or commit secrets.
+- Validate user input before storing or executing.
+- Keep auth flows in `app/dependencies.py` and use `Depends` for protected routes.
+- Use `HTTPException` for auth failures and clear status codes.
