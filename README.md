@@ -111,6 +111,9 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
 - `make shell`: Access the shell of the running application container.
 - `make db-shell`: Connect to a PostgreSQL shell inside the database container.
 - `make test`: Run the unit test suite.
+- `make lint`: Run web lint.
+- `make audit`: Run security audits for both API and web.
+- `make web-test`: Run web tests (Vitest).
 - `make agent-register q="..."`: Send a query to the registration agent.
 - `make agent-manage q="..."`: Send a query to the management agent.
 - `make agent-analyze q="..."`: Send a query to the analysis agent.
