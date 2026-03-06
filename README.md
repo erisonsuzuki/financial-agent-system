@@ -51,11 +51,12 @@ graph TD
 ### Environment Variables
 Before running the application, copy `.env.sample` to `.env` and fill in the values:
 * `POSTGRES_...`: Your database credentials.
-* `LLM_PROVIDER`: The AI provider to use. Can be `google` or `ollama`.
-* `GOOGLE_API_KEY`: Your API key if using Google Gemini.
-* `GOOGLE_MODEL`: The Gemini model to use (e.g., `gemini-1.5-flash`, `gemini-1.5-pro`).
-* `OLLAMA_BASE_URL`: The URL for your local Ollama server (e.g., `http://host.docker.internal:11434`).
-* `OLLAMA_MODEL`: The name of the Ollama model to use (e.g., `llama3`).
+* `LLM_PROVIDER`: The AI provider to use. Can be `groq` or `nvidia`.
+* `LLM_FALLBACK_PROVIDER`: Provider to use when the primary fails (defaults to `nvidia`).
+* `GROQ_API_KEY`: Your Groq API key.
+* `GROQ_MODEL`: The Groq model to use (e.g., `openai/gpt-oss-20b`).
+* `NVIDIA_API_KEY`: Your NVIDIA API key.
+* `NVIDIA_MODEL`: The Nemotron model to use (e.g., `nvidia/nemotron-3-nano-30b-a3b`).
 * `JWT_SECRET_KEY`: Secret used to sign API access tokens.
 * `FASTAPI_BASE_URL`: (optional for standalone web deployments) Public URL where the FastAPI service can be reached.
 * `INTERNAL_API_URL`: Base URL that agents use when they call the FastAPI service (defaults to `http://app:8000`; set to `http://localhost:8000` when running outside Docker).

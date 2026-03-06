@@ -17,7 +17,7 @@ export default function AssetSidebar({ assets, loading, error, hideAmounts = fal
     return (
       <div className="rounded-xl border border-slate-800 p-4 text-sm text-rose-400">
         Session expired. Please{" "}
-        <a href="/auth/login" className="underline text-rose-200">
+        <a href="/login" className="underline text-rose-200">
           log in
         </a>{" "}
         again.

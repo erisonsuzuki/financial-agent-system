@@ -1,37 +1,76 @@
+import logging
 import os
+from typing import Optional, cast
+
+import httpx
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_community.chat_models import ChatOllama
 from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain_core.language_models import BaseLanguageModel
 from langchain_core.prompts import ChatPromptTemplate
+
 from . import tools, config_loader
 from .callbacks import SafeStdOutCallbackHandler
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
+PROVIDER_MODEL_ENV = {
+    "groq": "GROQ_MODEL",
+    "nvidia": "NVIDIA_MODEL",
+}
+
+def resolve_model_name(provider: str, default_model: Optional[str] = None) -> str:
+    env_key = PROVIDER_MODEL_ENV.get(provider)
+    if env_key is None:
+        raise ValueError(f"Unsupported LLM provider: {provider}")
+    model_name = os.getenv(env_key) or default_model
+    if not model_name:
+        raise ValueError(f"Environment variable '{env_key}' not found and is required for provider '{provider}'.")
+    return model_name
+
 def get_llm(llm_config: dict):
     provider = llm_config.get("provider", "").lower()
-    model_name = llm_config.get("model_name")
+    model_name = resolve_model_name(provider, llm_config.get("model_name"))
     temperature = llm_config.get("temperature", 0.0)
 
-    if provider == "google":
-        return ChatGoogleGenerativeAI(model=model_name, temperature=temperature)
-    elif provider == "ollama":
-        return ChatOllama(
-            base_url=os.getenv("OLLAMA_BASE_URL"),
+    if provider == "groq":
+        from langchain_groq import ChatGroq
+        return ChatGroq(
             model=model_name,
-            temperature=temperature
+            temperature=temperature,
         )
-    else:
-        raise ValueError(f"Unsupported LLM provider: {provider}")
+    if provider == "nvidia":
+        from langchain_nvidia_ai_endpoints import ChatNVIDIA
+        return ChatNVIDIA(
+            model=model_name,
+            temperature=temperature,
+        )
+    raise ValueError(f"Unsupported LLM provider: {provider}")
 
-def create_agent_executor(agent_name: str):
-    config = config_loader.load_config(agent_name)
+def create_agent_executor(agent_name: str, config: Optional[dict] = None, provider_override: Optional[str] = None):
+    if config is None:
+        config = config_loader.load_config(agent_name)
     
     available_tools = [getattr(tools, tool_name) for tool_name in config.get("tools", [])]
 
-    llm = get_llm(config.get("llm", {}))
-    llm_with_tools = llm.bind_tools(tools=available_tools)
+    llm_config = dict(config.get("llm", {}))
+    if provider_override:
+        provider_override = provider_override.lower()
+        llm_config["provider"] = provider_override
+        llm_config["model_name"] = resolve_model_name(provider_override, llm_config.get("model_name"))
+
+    llm = get_llm(llm_config)
+    llm_with_tools = cast(BaseLanguageModel, llm.bind_tools(tools=available_tools))
+
+    logger.info(
+        "Agent LLM selected",
+        extra={
+            "agent_name": agent_name,
+            "provider": llm_config.get("provider"),
+            "model_name": llm_config.get("model_name"),
+        },
+    )
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", config.get("prompt_template", "You are a helpful assistant.")),
@@ -49,7 +88,51 @@ def create_agent_executor(agent_name: str):
     
     return agent_executor
 
+def is_transient_llm_error(exc: Exception) -> bool:
+    if isinstance(exc, httpx.HTTPStatusError):
+        status_code = exc.response.status_code
+        return status_code == 429 or 500 <= status_code <= 599
+
+    if isinstance(exc, (httpx.TimeoutException, httpx.ConnectError, httpx.ReadError, httpx.WriteError)):
+        return True
+
+    response = getattr(exc, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if status_code is not None:
+        return status_code == 429 or 500 <= status_code <= 599
+
+    message = str(exc).lower()
+    transient_markers = [
+        "rate limit",
+        "timeout",
+        "timed out",
+        "connection",
+        "temporarily unavailable",
+        "service unavailable",
+        "gateway",
+    ]
+    return any(marker in message for marker in transient_markers)
+
 def invoke_agent(agent_name: str, query: str) -> str:
-    agent_executor = create_agent_executor(agent_name)
-    response = agent_executor.invoke({"input": query})
-    return response.get("output", "Could not process the request.")
+    config = config_loader.load_config(agent_name)
+    primary_provider = config.get("llm", {}).get("provider", "").lower()
+    agent_executor = create_agent_executor(agent_name, config=config)
+
+    try:
+        response = agent_executor.invoke({"input": query})
+        return response.get("output", "Could not process the request.")
+    except Exception as exc:
+        fallback_provider = os.getenv("LLM_FALLBACK_PROVIDER", "nvidia").lower()
+        if (
+            fallback_provider
+            and fallback_provider != primary_provider
+            and is_transient_llm_error(exc)
+        ):
+            fallback_executor = create_agent_executor(
+                agent_name,
+                config=config,
+                provider_override=fallback_provider,
+            )
+            response = fallback_executor.invoke({"input": query})
+            return response.get("output", "Could not process the request.")
+        raise
