@@ -1,14 +1,18 @@
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
+from typing import Any, Dict, cast
 from fastapi import HTTPException, status
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 
 pwd_hasher = PasswordHasher()
 
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-me")
+_jwt_secret = os.getenv("JWT_SECRET_KEY")
+if not _jwt_secret:
+    raise RuntimeError("JWT_SECRET_KEY is required")
+JWT_SECRET_KEY: str = _jwt_secret
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "60"))
 
@@ -31,7 +35,7 @@ def create_access_token(data: Dict[str, Any], expires_delta: timedelta | None = 
 def decode_token(token: str) -> Dict[str, Any]:
     try:
         return jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-    except JWTError as exc:
+    except InvalidTokenError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
