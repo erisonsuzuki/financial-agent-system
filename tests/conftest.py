@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+os.environ["JWT_SECRET_KEY"] = "test-secret-key-with-at-least-32-bytes"
 
 from app.main import app
 from app.database import Base, get_db
