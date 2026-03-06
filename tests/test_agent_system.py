@@ -88,7 +88,11 @@ def test_invoke_agent_fallback_on_transient_error(monkeypatch):
 
     class FallbackExecutor:
         def invoke(self, payload):
-            return {"output": "fallback"}
+            class Message:
+                def __init__(self, content):
+                    self.content = content
+
+            return {"messages": [Message("fallback")]}
 
     calls = []
 
