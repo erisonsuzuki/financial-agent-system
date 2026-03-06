@@ -19,8 +19,13 @@ shell:
 db-shell:
 	docker compose exec db psql -U user -d financialdb
 
+# Usage: make test file=tests/test_example.py
 test:
-	docker compose exec api pytest
+	@if [ -n "$(file)" ]; then \
+		docker compose exec api pytest -- "$(file)"; \
+	else \
+		docker compose exec api pytest; \
+	fi
 
 api-audit:
 	docker compose exec --workdir /code/app api poetry run pip-audit

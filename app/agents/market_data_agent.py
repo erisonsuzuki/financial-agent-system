@@ -3,6 +3,9 @@ from decimal import Decimal
 from typing import Any, Dict, Iterable
 
 import yfinance as yf
+from sqlalchemy.orm import Session
+
+from app import crud
 
 # Simple in-memory cache to avoid excessive API calls
 _cache: Dict[str, Dict[str, Any]] = {}
@@ -30,20 +33,45 @@ def _ticker_candidates(ticker: str) -> Iterable[str]:
         yield f"{ticker}.SA"
 
 
-def get_current_price(ticker: str) -> Decimal | None:
+def get_current_price(
+    ticker: str,
+    db: Session | None = None,
+    force_refresh: bool = False,
+) -> tuple[Decimal | None, bool]:
     """
-    Fetches the current price for a given ticker, using a time-based cache and fallback suffixes.
+    Fetches the current price for a given ticker.
+
+    Returns a tuple of (price, is_stale).
     """
+    normalized_ticker = crud.normalize_ticker(ticker)
+
+    if db is not None:
+        cached_price = crud.get_cached_price(db, normalized_ticker)
+
+        if not force_refresh and crud.is_cached_price_fresh(cached_price):
+            return cached_price.price, False
+
+        for candidate in _ticker_candidates(normalized_ticker):
+            price_decimal = _try_fetch_price(candidate)
+            if price_decimal is not None:
+                crud.upsert_cached_price(db, normalized_ticker, price_decimal, source="yfinance")
+                return price_decimal, False
+
+        if cached_price is not None:
+            return cached_price.price, True
+
+        return None, False
+
     current_time = time.time()
 
-    cached_data = _cache.get(ticker)
+    cached_data = _cache.get(normalized_ticker)
     if cached_data and current_time - cached_data["timestamp"] < CACHE_TTL_SECONDS:
-        return cached_data["price"]
+        return cached_data["price"], False
 
-    for candidate in _ticker_candidates(ticker):
+    for candidate in _ticker_candidates(normalized_ticker):
         price_decimal = _try_fetch_price(candidate)
         if price_decimal is not None:
-            _cache[ticker] = {"price": price_decimal, "timestamp": current_time}
-            return price_decimal
+            _cache[normalized_ticker] = {"price": price_decimal, "timestamp": current_time}
+            return price_decimal, False
 
-    return None
+    return None, False

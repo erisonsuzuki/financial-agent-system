@@ -1,5 +1,7 @@
 from sqlalchemy.orm import Session, joinedload
 from typing import Optional
+from datetime import datetime, timezone
+from decimal import Decimal
 from . import models, schemas
 
 # --- User CRUD ---
@@ -117,6 +119,56 @@ def delete_dividend(db: Session, dividend_id: int) -> models.Dividend:
 
 def get_dividends_for_asset(db: Session, asset_id: int, skip: int = 0, limit: int = 100) -> list[models.Dividend]:
     return db.query(models.Dividend).filter(models.Dividend.asset_id == asset_id).offset(skip).limit(limit).all()
+
+
+# --- Asset Price Cache CRUD ---
+def normalize_ticker(ticker: str) -> str:
+    normalized_ticker = ticker.strip().upper()
+    if not normalized_ticker:
+        raise ValueError("Ticker must not be empty")
+    return normalized_ticker
+
+
+def get_cached_price(db: Session, ticker: str) -> models.AssetPriceCache | None:
+    normalized_ticker = normalize_ticker(ticker)
+    return db.query(models.AssetPriceCache).filter(models.AssetPriceCache.ticker == normalized_ticker).first()
+
+
+def upsert_cached_price(
+    db: Session,
+    ticker: str,
+    price: Decimal,
+    source: str = "yfinance",
+    fetched_at: datetime | None = None,
+) -> models.AssetPriceCache:
+    normalized_ticker = normalize_ticker(ticker)
+    cached_price = models.AssetPriceCache(
+        ticker=normalized_ticker,
+        price=price,
+        source=source,
+        fetched_at=fetched_at or datetime.now(timezone.utc),
+    )
+    merged_cached_price = db.merge(cached_price)
+    db.commit()
+    db.refresh(merged_cached_price)
+    return merged_cached_price
+
+
+def is_cached_price_fresh(
+    cached_price: models.AssetPriceCache | None,
+    ttl_seconds: int = 3600,
+    now: datetime | None = None,
+) -> bool:
+    if cached_price is None:
+        return False
+
+    current_time = now or datetime.now(timezone.utc)
+    fetched_at = cached_price.fetched_at
+    if fetched_at.tzinfo is None:
+        fetched_at = fetched_at.replace(tzinfo=timezone.utc)
+
+    age_seconds = (current_time - fetched_at).total_seconds()
+    return age_seconds <= ttl_seconds
 
 # --- Agent Action CRUD ---
 def create_agent_action(db: Session, user_id: int, payload: schemas.AgentActionCreate) -> models.AgentAction:

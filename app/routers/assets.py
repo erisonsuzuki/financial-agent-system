@@ -44,19 +44,26 @@ def delete_existing_asset(asset_id: int, db: Session = Depends(get_db)):
     return db_asset
 
 @router.get("/{ticker}/price", response_model=schemas.AssetPrice)
-def get_asset_price(ticker: str):
-    price = market_data_agent.get_current_price(ticker=ticker)
+def get_asset_price(ticker: str, refresh: bool = False, db: Session = Depends(get_db)):
+    price, is_stale = market_data_agent.get_current_price(ticker=ticker, db=db, force_refresh=refresh)
     if price is None:
         raise HTTPException(status_code=404, detail=f"Could not retrieve price for ticker {ticker}")
-    return schemas.AssetPrice(ticker=ticker, price=price)
+    cached = crud.get_cached_price(db, ticker)
+    return schemas.AssetPrice(
+        ticker=ticker,
+        price=price,
+        source=cached.source if cached is not None else "yfinance",
+        fetched_at=cached.fetched_at if cached is not None else None,
+        is_stale=is_stale,
+    )
 
 @router.get("/{ticker}/analysis", response_model=schemas.AssetAnalysis)
-def get_asset_analysis(ticker: str, db: Session = Depends(get_db)):
+def get_asset_analysis(ticker: str, refresh: bool = False, db: Session = Depends(get_db)):
     db_asset = crud.get_asset_by_ticker(db, ticker=ticker)
     if db_asset is None:
         raise HTTPException(status_code=404, detail="Asset not found")
     
-    analysis = portfolio_analyzer_agent.analyze_asset(db=db, asset=db_asset)
+    analysis = portfolio_analyzer_agent.analyze_asset(db=db, asset=db_asset, refresh=refresh)
     return analysis
 
 @router.get("/{asset_id}/transactions", response_model=List[schemas.Transaction])

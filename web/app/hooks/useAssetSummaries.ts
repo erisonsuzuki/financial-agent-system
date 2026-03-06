@@ -8,13 +8,23 @@ export type AssetSummary = {
   ticker: string;
   units: number;
   averagePrice: number;
+  currentPrice: number | null;
+  plValue: number | null;
+  plPercent: number | null;
+  dividends: number;
+  totalReturnValue: number | null;
+  totalReturnPercent: number | null;
+  priceFetchedAt: string | null;
+  isStale: boolean;
+  error?: string;
 };
 
-export function useAssetSummaries(isAuthenticated: boolean) {
+export function useAssetSummaries(isAuthenticated: boolean, refresh: boolean = false) {
   return useQuery({
-    queryKey: ["assets-summary", isAuthenticated ? "auth" : "guest"],
+    queryKey: ["assets-summary", isAuthenticated ? "auth" : "guest", refresh ? "refresh" : "default"],
     queryFn: async () => {
-      const res = await fetch("/api/assets-summary", { cache: "no-store", credentials: "include" });
+      const query = refresh ? "?refresh=true" : "";
+      const res = await fetch(`/api/assets-summary${query}`, { cache: "no-store", credentials: "include" });
       if (res.status === 401) {
         throw new Error("Session expired");
       }
