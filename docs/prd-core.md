@@ -11,7 +11,7 @@ The project is an investment management system focused on Stocks and Real Estate
 * **Project Repository:** https://github.com/erisonsuzuki/financial_agent_system
 * **Core Architecture:** The business logic is distributed among specialized agents, each with a unique responsibility (Market Data Fetching, Financial Calculations, Database Persistence, Report Generation).
 * **Orchestration:** An orchestrator agent, implemented with LangGraph, manages the communication flow and the sequence of tasks among the other agents to fulfill user requests.
-* **LLM Models:** The system is designed to be LLM-agnostic, allowing integration with cloud APIs (like Google Gemini) and local models (via Ollama) through LangChain's abstractions.
+* **LLM Models:** The system is designed to be LLM-agnostic, allowing integration with cloud APIs (Groq, NVIDIA Nemotron) through LangChain's abstractions.
 
 ### 1.2. Code Standards and Tech Stack
 
@@ -84,4 +84,8 @@ The implementation of the `PortfolioAnalyzerAgent` revealed a critical issue reg
 ### Lessons Learned from Phase 8
 * **Modern Tool Definition in LangChain:** Initial deprecation warnings from LangChain's use of Pydantic V1 methods (`.parse_obj`, `.dict`) were observed. The root cause was the use of the `args_schema` parameter in the `@tool` decorator. The modern, correct, and Pydantic V2-compliant solution is to define tool arguments directly in the function signature using `typing.Annotated`. This approach is cleaner, more pythonic, and resolves the deprecation warnings. This is the standard for all tool definitions going forward.
 
-* **Managing Log Noise from Third-Party Libraries:** Harmless but verbose warnings (e.g., `Key 'title' is not supported...`) were being emitted by internal LangChain loggers. The most robust and precise solution, rather than using broad filters or global log level changes, is to **identify the specific logger by its full name** (e.g., `langchain_google_genai._function_utils`) and **surgically set its log level** to a higher threshold (e.g., `logging.ERROR`). This is best managed in a centralized `app/logging_config.py` module, providing precise control over log noise without affecting desired application logs.
+* **Managing Log Noise from Third-Party Libraries:** Harmless but verbose warnings (e.g., `Key 'title' is not supported...`) were being emitted by internal LangChain loggers. The most robust and precise solution, rather than using broad filters or global log level changes, is to **identify the specific logger by its full name** (e.g., `langchain_groq`) and **surgically set its log level** to a higher threshold (e.g., `logging.ERROR`). This is best managed in a centralized `app/logging_config.py` module, providing precise control over log noise without affecting desired application logs.
+
+### Lessons Learned from Phase 19
+* **Provider Support Must Match Wiring:** Having env vars listed is not sufficient to claim provider support. Provider wiring in the orchestrator must be verified before documenting a new LLM provider, otherwise onboarding and deployment docs become misleading.
+* **Model Placeholders Must Be Provider-Aware:** Agent configs should not hardcode provider-specific model envs. Use a neutral placeholder (e.g., `${LLM_MODEL}`) and resolve it based on `LLM_PROVIDER` in the config loader to avoid drift when providers change.

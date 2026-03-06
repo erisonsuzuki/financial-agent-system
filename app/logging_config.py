@@ -1,4 +1,5 @@
 import logging
 
 def setup_logging():
-    logging.getLogger("langchain_google_genai._function_utils").setLevel(logging.ERROR)
+    logging.getLogger("langchain_groq").setLevel(logging.ERROR)
+    logging.getLogger("langchain_nvidia_ai_endpoints").setLevel(logging.ERROR)

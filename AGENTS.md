@@ -5,7 +5,7 @@
 - Backend (FastAPI) lives in `app/`; entrypoint and dependencies via Poetry. Local tests: `make test` (runs `pytest` inside the api container). Dev server is automatically started by Compose; API served at `http://localhost:8000`.
 - Frontend (Next.js App Router) lives in `web/`. Convenience Make targets: `make web-install`, `make web-dev`, `make web-build`, `make web-lint`. When running under Compose, web is served at `http://localhost:3000` and points to the API via `FASTAPI_BASE_URL` env.
 - Agent configs are YAML in `app/agents/configs/`; orchestrator and tools in `app/agents/`. Router endpoints for agents in `app/routers/agent.py`. Web chat/dashboard in `web/app/dashboard/`.
-- Key env vars: copy `.env.sample` → `.env`. API expects Postgres creds and LLM settings (`LLM_PROVIDER`, `GOOGLE_MODEL`, `GOOGLE_API_KEY`/`OLLAMA_*`, `JWT_SECRET_KEY`, `INTERNAL_API_URL`). Web honors `FASTAPI_BASE_URL` (set to `http://api:8000` in Compose). Render deploy uses `render.yaml`.
+- Key env vars: copy `.env.sample` → `.env`. API expects Postgres creds and LLM settings (`LLM_PROVIDER`, `LLM_FALLBACK_PROVIDER`, `GROQ_MODEL`, `GROQ_API_KEY`, `NVIDIA_MODEL`, `NVIDIA_API_KEY`, `JWT_SECRET_KEY`, `INTERNAL_API_URL`). Web honors `FASTAPI_BASE_URL` (set to `http://api:8000` in Compose). Render deploy uses `render.yaml`.
 - Makefile shortcuts for agent calls: `make agent-register q="..."`, `make agent-manage q="..."`, `make agent-analyze q="..."`.
 
 ## Testing instructions
@@ -29,7 +29,7 @@
 - Logs: `make logs` or `docker compose logs -f api` / `docker compose logs -f web`. Shell: `make shell` (api), `make db-shell` (psql).
 
 ### Deployment
-- Render config: `render.yaml` (Docker deploy for FastAPI). Ensure env vars (`POSTGRES_*`, `LLM_PROVIDER`, `GOOGLE_MODEL`, `JWT_SECRET_KEY`, `FASTAPI_BASE_URL`) are set in Render dashboard. Health check path: `/health`.
+- Render config: `render.yaml` (Docker deploy for FastAPI). Ensure env vars (`POSTGRES_*`, `LLM_PROVIDER`, `LLM_FALLBACK_PROVIDER`, `GROQ_MODEL`, `NVIDIA_MODEL`, `JWT_SECRET_KEY`, `FASTAPI_BASE_URL`) are set in Render dashboard. Health check path: `/health`.
 - Next.js image served via `web/Dockerfile`; set `FASTAPI_BASE_URL` to the API’s public URL when web is deployed separately.
 
 ### Project Overview
@@ -39,7 +39,7 @@
 
 ### Security Considerations
 - JWT secret (`JWT_SECRET_KEY`) required by FastAPI auth; keep it out of source control. Tokens stored as HTTP-only cookies on the web side.
-- LLM provider keys (`GOOGLE_API_KEY`, `OLLAMA_BASE_URL`) must be set per environment; do not commit secrets.
+- LLM provider keys (`GROQ_API_KEY`, `NVIDIA_API_KEY`) must be set per environment; do not commit secrets.
 - Internal agent calls use `INTERNAL_API_URL` (defaults to `http://app:8000` in Docker). If you enforce auth on assets/transactions later, ensure tools send proper Authorization headers.
 
 ### Code Style Guidelines

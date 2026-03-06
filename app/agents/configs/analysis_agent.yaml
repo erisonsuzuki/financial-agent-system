@@ -3,7 +3,7 @@ description: "An agent that analyzes the user's portfolio and provides investmen
 
 llm:
   provider: ${LLM_PROVIDER}
-  model_name: ${GOOGLE_MODEL}
+  model_name: ${LLM_MODEL}
   temperature: 0.0
 
 tools:

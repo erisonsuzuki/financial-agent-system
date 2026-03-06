@@ -26,12 +26,24 @@ def load_config(agent_name: str, base_path: Optional[Path] = None) -> dict:
     for placeholder in placeholders:
         env_value = os.getenv(placeholder)
         if env_value is None:
-            if placeholder == "GOOGLE_MODEL" and os.getenv("LLM_PROVIDER", "").lower() == "ollama":
-                env_value = os.getenv("OLLAMA_MODEL")
-            
+            if placeholder == "LLM_MODEL":
+                provider = os.getenv("LLM_PROVIDER", "").lower()
+                provider_env_map = {
+                    "groq": "GROQ_MODEL",
+                    "nvidia": "NVIDIA_MODEL",
+                }
+                provider_env = provider_env_map.get(provider)
+                if provider_env is None:
+                    raise ValueError(f"Unsupported LLM provider: {provider}")
+                env_value = os.getenv(provider_env)
+                if env_value is None:
+                    raise ValueError(
+                        f"Environment variable '{provider_env}' not found and is required for provider '{provider}'."
+                    )
+
             if env_value is None:
                 raise ValueError(f"Environment variable '{placeholder}' not found and is required.")
-        
+
         raw_content = raw_content.replace(f'${{{placeholder}}}', env_value)
             
     loaded_yaml = yaml.safe_load(raw_content)
