@@ -4,12 +4,9 @@ from typing import Optional, cast
 
 import httpx
 from dotenv import load_dotenv
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.language_models import BaseLanguageModel
-from langchain_core.prompts import ChatPromptTemplate
+from langchain.agents import create_agent
 
 from . import tools, config_loader
-from .callbacks import SafeStdOutCallbackHandler
 
 load_dotenv()
 
@@ -61,7 +58,6 @@ def create_agent_executor(agent_name: str, config: Optional[dict] = None, provid
         llm_config["model_name"] = resolve_model_name(provider_override, llm_config.get("model_name"))
 
     llm = get_llm(llm_config)
-    llm_with_tools = cast(BaseLanguageModel, llm.bind_tools(tools=available_tools))
 
     logger.info(
         "Agent LLM selected",
@@ -72,21 +68,14 @@ def create_agent_executor(agent_name: str, config: Optional[dict] = None, provid
         },
     )
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", config.get("prompt_template", "You are a helpful assistant.")),
-        ("human", "{input}"),
-        ("placeholder", "{agent_scratchpad}"),
-    ])
-    
-    agent = create_tool_calling_agent(llm_with_tools, available_tools, prompt)
-    agent_executor = AgentExecutor(
-        agent=agent,
+    agent = create_agent(
+        model=llm,
         tools=available_tools,
-        verbose=True,
-        callbacks=[SafeStdOutCallbackHandler()],
+        system_prompt=config.get("prompt_template", "You are a helpful assistant."),
+        debug=True,
     )
-    
-    return agent_executor
+
+    return agent
 
 def is_transient_llm_error(exc: Exception) -> bool:
     if isinstance(exc, httpx.HTTPStatusError):
@@ -119,8 +108,11 @@ def invoke_agent(agent_name: str, query: str) -> str:
     agent_executor = create_agent_executor(agent_name, config=config)
 
     try:
-        response = agent_executor.invoke({"input": query})
-        return response.get("output", "Could not process the request.")
+        response = agent_executor.invoke({"messages": [{"role": "user", "content": query}]})
+        messages = response.get("messages", [])
+        if not messages:
+            return "Could not process the request."
+        return messages[-1].content
     except Exception as exc:
         fallback_provider = os.getenv("LLM_FALLBACK_PROVIDER", "nvidia").lower()
         if (
@@ -133,6 +125,9 @@ def invoke_agent(agent_name: str, query: str) -> str:
                 config=config,
                 provider_override=fallback_provider,
             )
-            response = fallback_executor.invoke({"input": query})
-            return response.get("output", "Could not process the request.")
+            response = fallback_executor.invoke({"messages": [{"role": "user", "content": query}]})
+            messages = response.get("messages", [])
+            if not messages:
+                return "Could not process the request."
+            return messages[-1].content
         raise

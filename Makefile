@@ -22,11 +22,16 @@ db-shell:
 test:
 	docker compose exec api pytest
 
+api-audit:
+	docker compose exec --workdir /code/app api poetry run pip-audit
+
 web-test:
 	docker compose run --rm -e NODE_ENV=development -v $(PWD)/web:/app -w /app web sh -lc "npm install --include=dev && npm test"
 
 web-audit:
-	docker compose run --rm -e NODE_ENV=development -v $(PWD)/web:/app -w /app web sh -lc "npm install --include=dev && npm audit fix --force"
+	docker compose run --rm -e NODE_ENV=development -v $(PWD)/web:/app -w /app web sh -lc "npm install --include=dev && npm audit --audit-level=high"
+
+audit: api-audit web-audit
 
 web-dev:
 	npm run dev --prefix web
