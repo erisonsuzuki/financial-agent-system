@@ -26,10 +26,10 @@ api-audit:
 	docker compose exec --workdir /code/app api poetry run pip-audit
 
 web-test:
-	docker compose run --rm -e NODE_ENV=development -v $(PWD)/web:/app -w /app web sh -lc "npm install --include=dev && npm test"
+	docker compose run --rm -e NODE_ENV=development -v $(PWD)/web:/app -v web_node_modules:/app/node_modules -w /app web sh -lc "npm install --include=dev && npm test"
 
 web-audit:
-	docker compose run --rm -e NODE_ENV=development -v $(PWD)/web:/app -w /app web sh -lc "npm install --include=dev && npm audit --audit-level=high"
+	docker compose run --rm -e NODE_ENV=development -v $(PWD)/web:/app -v web_node_modules:/app/node_modules -w /app web sh -lc "npm install --include=dev && npm audit --audit-level=high"
 
 audit: api-audit web-audit
 
