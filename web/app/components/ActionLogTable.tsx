@@ -30,7 +30,12 @@ export default function ActionLogTable({ entries }: Props) {
               <td className="px-4 py-3 text-slate-200 max-w-xs">
                 <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{entry.question}</p>
                 {entry.tool_calls && (
-                  <pre className="mt-2 rounded bg-slate-950 p-2 text-xs text-slate-400 overflow-x-auto">
+                  <pre
+                    className="mt-2 max-h-40 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded bg-slate-950 p-2 text-xs text-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500"
+                    tabIndex={0}
+                    role="region"
+                    aria-label="Tool call details"
+                  >
 {JSON.stringify(entry.tool_calls, null, 2)}
                   </pre>
                 )}
