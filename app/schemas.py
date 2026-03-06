@@ -29,6 +29,8 @@ class AssetPrice(BaseModel):
     ticker: str
     price: Decimal
     source: str = "yfinance"
+    fetched_at: datetime | None = None
+    is_stale: bool = False
 
 # --- Transaction Schemas ---
 class TransactionBase(BaseModel):
@@ -77,6 +79,8 @@ class AssetAnalysis(BaseModel):
     financial_return_value: Decimal | None
     financial_return_percent: Decimal | None
     total_dividends_received: Decimal
+    fetched_at: datetime | None = None
+    is_stale: bool = False
 
 # --- Agent Action Schemas ---
 class AgentActionCreate(BaseModel):

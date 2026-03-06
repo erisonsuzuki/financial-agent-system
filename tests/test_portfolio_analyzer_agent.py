@@ -22,7 +22,7 @@ def test_analyze_asset_full_scenario(db_session: Session):
 
     # Mock the external price agent
     with patch('app.agents.market_data_agent.get_current_price') as mock_get_price:
-        mock_get_price.return_value = Decimal("15.00")  # Set a mock current market price
+        mock_get_price.return_value = (Decimal("15.00"), False)
 
         # Act: Run the analysis
         analysis = portfolio_analyzer_agent.analyze_asset(db=db_session, asset=asset)
@@ -52,3 +52,4 @@ def test_analyze_asset_full_scenario(db_session: Session):
         
         # return_percent = (649.50 / 1600.50) * 100 = 40.581... -> rounded to 40.58
         assert analysis.financial_return_percent == Decimal("40.58")
+        assert analysis.is_stale is False

@@ -1,5 +1,10 @@
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
+from unittest.mock import patch
+from datetime import datetime, timezone
+from decimal import Decimal
+
+from app import crud
 
 def test_create_asset_success(client: TestClient):
     response = client.post(
@@ -83,3 +88,54 @@ def test_delete_asset_not_found(client: TestClient):
     response = client.delete("/assets/99999")
     assert response.status_code == 404
     assert response.json() == {"detail": "Asset not found"}
+
+
+def test_get_asset_price_returns_refresh_metadata(client: TestClient, db_session):
+    crud.upsert_cached_price(
+        db_session,
+        "AAPL",
+        Decimal("170.00"),
+        fetched_at=datetime.now(timezone.utc),
+    )
+
+    with patch("app.agents.market_data_agent.get_current_price") as mock_get_price:
+        mock_get_price.return_value = (Decimal("170.00"), False)
+
+        response = client.get("/assets/AAPL/price?refresh=true")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ticker"] == "AAPL"
+    assert data["price"] == "170.00"
+    assert data["source"] == "yfinance"
+    assert data["is_stale"] is False
+    assert data["fetched_at"] is not None
+    mock_get_price.assert_called_once_with(ticker="AAPL", db=db_session, force_refresh=True)
+
+
+def test_get_asset_analysis_passes_refresh_flag(client: TestClient, db_session):
+    asset_data = {"ticker": "MSFT", "name": "MICROSOFT", "asset_type": "STOCK", "sector": "Technology"}
+    response_post = client.post("/assets/", json=asset_data)
+    assert response_post.status_code == 201
+
+    with patch("app.agents.portfolio_analyzer_agent.analyze_asset") as mock_analyze:
+        mock_analyze.return_value = {
+            "ticker": "MSFT",
+            "total_quantity": 0,
+            "average_price": "0.00",
+            "total_invested": "0.00",
+            "current_market_price": None,
+            "current_market_value": None,
+            "financial_return_value": None,
+            "financial_return_percent": None,
+            "total_dividends_received": "0.00",
+            "fetched_at": None,
+            "is_stale": False,
+        }
+
+        response = client.get("/assets/MSFT/analysis?refresh=true")
+
+    assert response.status_code == 200
+    called_kwargs = mock_analyze.call_args.kwargs
+    assert called_kwargs["db"] == db_session
+    assert called_kwargs["refresh"] is True

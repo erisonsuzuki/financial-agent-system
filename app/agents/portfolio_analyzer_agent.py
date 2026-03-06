@@ -3,7 +3,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from app import models, schemas, crud
 from app.agents import market_data_agent
 
-def analyze_asset(db: Session, asset: models.Asset) -> schemas.AssetAnalysis:
+def analyze_asset(db: Session, asset: models.Asset, refresh: bool = False) -> schemas.AssetAnalysis:
     """
     Performs a complete financial analysis for a single asset using Decimal for precision.
     """
@@ -32,7 +32,12 @@ def analyze_asset(db: Session, asset: models.Asset) -> schemas.AssetAnalysis:
     )
     total_dividends_received = dividends_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-    current_market_price = market_data_agent.get_current_price(ticker=asset.ticker)
+    current_market_price, is_stale = market_data_agent.get_current_price(
+        ticker=asset.ticker,
+        db=db,
+        force_refresh=refresh,
+    )
+    cached_price = crud.get_cached_price(db, asset.ticker) if current_market_price is not None else None
 
     current_market_value = None
     financial_return_value = None
@@ -54,4 +59,6 @@ def analyze_asset(db: Session, asset: models.Asset) -> schemas.AssetAnalysis:
         financial_return_value=financial_return_value,
         financial_return_percent=financial_return_percent,
         total_dividends_received=total_dividends_received,
+        fetched_at=cached_price.fetched_at if cached_price is not None else None,
+        is_stale=is_stale,
     )

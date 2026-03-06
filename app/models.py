@@ -66,3 +66,12 @@ class AgentAction(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="actions")
+
+
+class AssetPriceCache(Base):
+    __tablename__ = "asset_price_cache"
+
+    ticker = Column(String, primary_key=True)
+    price = Column(Numeric(10, 2), nullable=False)
+    source = Column(String, default="yfinance", nullable=False)
+    fetched_at = Column(DateTime(timezone=True), nullable=False)
