@@ -1,11 +1,13 @@
 import time
-from decimal import Decimal
-from typing import Any, Dict, Iterable
+from datetime import date
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Any, Dict
 
 import yfinance as yf
 from sqlalchemy.orm import Session
 
 from app import crud
+from app.agents.ticker_utils import ticker_candidates
 
 # Simple in-memory cache to avoid excessive API calls
 _cache: Dict[str, Dict[str, Any]] = {}
@@ -19,18 +21,9 @@ def _try_fetch_price(symbol: str) -> Decimal | None:
         if hist.empty:
             return None
         price = hist["Close"].iloc[-1]
-        return Decimal(str(price)).quantize(Decimal("0.01"))
+        return Decimal(str(price)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     except Exception:
         return None
-
-
-def _ticker_candidates(ticker: str) -> Iterable[str]:
-    """
-    Builds a list of symbols to try. For Brazilian tickers we also attempt the `.SA` suffix.
-    """
-    yield ticker
-    if "." not in ticker:
-        yield f"{ticker}.SA"
 
 
 def get_current_price(
@@ -51,7 +44,7 @@ def get_current_price(
         if not force_refresh and crud.is_cached_price_fresh(cached_price):
             return cached_price.price, False
 
-        for candidate in _ticker_candidates(normalized_ticker):
+        for candidate in ticker_candidates(normalized_ticker):
             price_decimal = _try_fetch_price(candidate)
             if price_decimal is not None:
                 crud.upsert_cached_price(db, normalized_ticker, price_decimal, source="yfinance")
@@ -68,10 +61,30 @@ def get_current_price(
     if cached_data and current_time - cached_data["timestamp"] < CACHE_TTL_SECONDS:
         return cached_data["price"], False
 
-    for candidate in _ticker_candidates(normalized_ticker):
+    for candidate in ticker_candidates(normalized_ticker):
         price_decimal = _try_fetch_price(candidate)
         if price_decimal is not None:
             _cache[normalized_ticker] = {"price": price_decimal, "timestamp": current_time}
             return price_decimal, False
 
     return None, False
+
+
+def get_latest_dividend(ticker: str) -> tuple[Decimal | None, date | None]:
+    """
+    Fetches latest dividend per share and payment date for a ticker.
+    """
+    normalized_ticker = crud.normalize_ticker(ticker)
+
+    for candidate in ticker_candidates(normalized_ticker):
+        try:
+            dividends = yf.Ticker(candidate).dividends
+            if dividends.empty:
+                continue
+            latest_value = Decimal(str(dividends.iloc[-1])).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+            latest_date = dividends.index[-1].date()
+            return latest_value, latest_date
+        except Exception:
+            continue
+
+    return None, None

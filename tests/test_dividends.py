@@ -96,3 +96,44 @@ def test_delete_dividend_not_found(client: TestClient):
     response = client.delete("/dividends/99999")
     assert response.status_code == 404
     assert response.json() == {"detail": "Dividend not found"}
+
+
+def test_list_dividends_filters_by_asset_and_payment_date(client: TestClient):
+    asset_data = {"ticker": "LIST4", "name": "LIST ASSET", "asset_type": "STOCK", "sector": "Testing"}
+    response_asset = client.post("/assets/", json=asset_data)
+    asset_id = response_asset.json()["id"]
+
+    client.post(
+        "/dividends/",
+        json={"asset_id": asset_id, "amount_per_share": "0.1100", "payment_date": "2026-01-10"},
+    )
+    client.post(
+        "/dividends/",
+        json={"asset_id": asset_id, "amount_per_share": "0.2200", "payment_date": "2026-02-10"},
+    )
+
+    response = client.get(f"/dividends/?asset_id={asset_id}&payment_date=2026-01-10")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["amount_per_share"] == "0.1100"
+    assert data[0]["payment_date"] == "2026-01-10"
+
+
+def test_create_dividend_same_date_is_idempotent(client: TestClient):
+    asset_data = {"ticker": "IDEMP4", "name": "IDEMPOTENT ASSET", "asset_type": "STOCK", "sector": "Testing"}
+    response_asset = client.post("/assets/", json=asset_data)
+    asset_id = response_asset.json()["id"]
+
+    payload = {"asset_id": asset_id, "amount_per_share": "0.3000", "payment_date": "2026-06-30"}
+    first_response = client.post("/dividends/", json=payload)
+    second_response = client.post("/dividends/", json=payload)
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 201
+    assert first_response.json()["id"] == second_response.json()["id"]
+
+    list_response = client.get(f"/dividends/?asset_id={asset_id}&payment_date=2026-06-30")
+    assert list_response.status_code == 200
+    assert len(list_response.json()) == 1

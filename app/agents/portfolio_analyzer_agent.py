@@ -3,11 +3,48 @@ from decimal import Decimal, ROUND_HALF_UP
 from app import models, schemas, crud
 from app.agents import market_data_agent
 
+
+def _quantize_dividend_amount(value: Decimal) -> Decimal:
+    return value.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+
+
+def _sync_latest_dividend_for_asset(db: Session, asset: models.Asset) -> None:
+    external_amount, external_payment_date = market_data_agent.get_latest_dividend(asset.ticker)
+    if external_amount is None or external_payment_date is None:
+        return
+
+    normalized_external_amount = _quantize_dividend_amount(external_amount)
+    same_date_dividend = crud.get_dividend_for_asset_on_date(db, asset.id, external_payment_date)
+    if same_date_dividend is not None:
+        existing_amount = _quantize_dividend_amount(Decimal(str(same_date_dividend.amount_per_share)))
+        if existing_amount != normalized_external_amount:
+            crud.update_dividend(
+                db=db,
+                db_dividend=same_date_dividend,
+                dividend_in=schemas.DividendUpdate(amount_per_share=normalized_external_amount),
+            )
+        return
+
+    latest_dividend = crud.get_latest_dividend_for_asset(db, asset.id)
+    if latest_dividend is not None and latest_dividend.payment_date >= external_payment_date:
+        return
+
+    crud.create_asset_dividend(
+        db=db,
+        dividend=schemas.DividendCreate(
+            asset_id=asset.id,
+            amount_per_share=normalized_external_amount,
+            payment_date=external_payment_date,
+        ),
+    )
+
 def analyze_asset(db: Session, asset: models.Asset, refresh: bool = False) -> schemas.AssetAnalysis:
     """
     Performs a complete financial analysis for a single asset using Decimal for precision.
     """
     transactions = crud.get_transactions(db=db, asset_id=asset.id, limit=10000)
+    if refresh:
+        _sync_latest_dividend_for_asset(db=db, asset=asset)
     dividends = crud.get_dividends_for_asset(db=db, asset_id=asset.id, limit=10000)
 
     total_quantity = sum(Decimal(str(t.quantity)) for t in transactions)
@@ -17,7 +54,10 @@ def analyze_asset(db: Session, asset: models.Asset, refresh: bool = False) -> sc
 
     if total_quantity > 0:
         buy_transactions = [t for t in transactions if t.quantity > 0]
-        total_cost = sum(Decimal(str(t.quantity)) * t.price for t in buy_transactions)
+        total_cost = sum(
+            (Decimal(str(t.quantity)) * Decimal(str(t.price)) for t in buy_transactions),
+            Decimal("0.00"),
+        )
         total_shares_bought = sum(Decimal(str(t.quantity)) for t in buy_transactions)
         
         if total_shares_bought > 0:

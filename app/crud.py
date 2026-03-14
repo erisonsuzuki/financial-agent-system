@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.exc import IntegrityError
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from decimal import Decimal
 from . import models, schemas
 
@@ -94,12 +95,38 @@ def get_transactions_for_asset(db: Session, asset_id: int, skip: int = 0, limit:
 def get_dividend(db: Session, dividend_id: int) -> models.Dividend | None:
     return db.query(models.Dividend).filter(models.Dividend.id == dividend_id).first()
 
+
+def get_dividends(
+    db: Session,
+    asset_id: int | None = None,
+    payment_date: date | None = None,
+    skip: int = 0,
+    limit: int = 100,
+) -> list[models.Dividend]:
+    query = db.query(models.Dividend)
+    if asset_id is not None:
+        query = query.filter(models.Dividend.asset_id == asset_id)
+    if payment_date is not None:
+        query = query.filter(models.Dividend.payment_date == payment_date)
+    return query.order_by(models.Dividend.payment_date.desc(), models.Dividend.id.desc()).offset(skip).limit(limit).all()
+
 def create_asset_dividend(db: Session, dividend: schemas.DividendCreate) -> models.Dividend:
     db_dividend = models.Dividend(**dividend.model_dump())
     db.add(db_dividend)
-    db.commit()
-    db.refresh(db_dividend)
-    return db_dividend
+    try:
+        db.commit()
+        db.refresh(db_dividend)
+        return db_dividend
+    except IntegrityError:
+        db.rollback()
+        existing_dividend = get_dividend_for_asset_on_date(
+            db=db,
+            asset_id=dividend.asset_id,
+            payment_date=dividend.payment_date,
+        )
+        if existing_dividend is None:
+            raise
+        return existing_dividend
 
 def update_dividend(db: Session, db_dividend: models.Dividend, dividend_in: schemas.DividendUpdate) -> models.Dividend:
     update_data = dividend_in.model_dump(exclude_unset=True)
@@ -119,6 +146,24 @@ def delete_dividend(db: Session, dividend_id: int) -> models.Dividend:
 
 def get_dividends_for_asset(db: Session, asset_id: int, skip: int = 0, limit: int = 100) -> list[models.Dividend]:
     return db.query(models.Dividend).filter(models.Dividend.asset_id == asset_id).offset(skip).limit(limit).all()
+
+
+def get_latest_dividend_for_asset(db: Session, asset_id: int) -> models.Dividend | None:
+    return (
+        db.query(models.Dividend)
+        .filter(models.Dividend.asset_id == asset_id)
+        .order_by(models.Dividend.payment_date.desc(), models.Dividend.id.desc())
+        .first()
+    )
+
+
+def get_dividend_for_asset_on_date(db: Session, asset_id: int, payment_date: date) -> models.Dividend | None:
+    return (
+        db.query(models.Dividend)
+        .filter(models.Dividend.asset_id == asset_id, models.Dividend.payment_date == payment_date)
+        .order_by(models.Dividend.id.desc())
+        .first()
+    )
 
 
 # --- Asset Price Cache CRUD ---

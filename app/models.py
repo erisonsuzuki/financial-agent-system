@@ -10,6 +10,7 @@ from sqlalchemy import (
     Text,
     DateTime,
     JSON,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -41,6 +42,7 @@ class Transaction(Base):
 
 class Dividend(Base):
     __tablename__ = "dividends"
+    __table_args__ = (UniqueConstraint("asset_id", "payment_date", name="uq_dividends_asset_id_payment_date"),)
     id = Column(Integer, primary_key=True, index=True)
     asset_id = Column(Integer, ForeignKey("assets.id"), nullable=False)
     amount_per_share = Column(Numeric(10, 4), nullable=False)
