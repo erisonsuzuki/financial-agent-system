@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+from datetime import date
 from app import crud, schemas
 from app.database import get_db
 
@@ -16,6 +17,23 @@ def add_dividend(dividend: schemas.DividendCreate, db: Session = Depends(get_db)
     if not db_asset:
         raise HTTPException(status_code=404, detail="Asset not found")
     return crud.create_asset_dividend(db=db, dividend=dividend)
+
+
+@router.get("/", response_model=List[schemas.Dividend])
+def list_dividends(
+    asset_id: int | None = None,
+    payment_date: date | None = None,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+):
+    return crud.get_dividends(
+        db=db,
+        asset_id=asset_id,
+        payment_date=payment_date,
+        skip=skip,
+        limit=limit,
+    )
 
 @router.get("/{dividend_id}", response_model=schemas.Dividend)
 def read_dividend(dividend_id: int, db: Session = Depends(get_db)):

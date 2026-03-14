@@ -1,10 +1,11 @@
 import os
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Annotated, Optional, List, Any
 
 import httpx
 from langchain.tools import tool
+from app.agents import market_data_agent
 
 BASE_API_URL = os.getenv("INTERNAL_API_URL", "http://app:8000")
 
@@ -16,6 +17,10 @@ def _parse_ticker_from_input(ticker_input: Any) -> str:
     if isinstance(ticker_input, dict):
         ticker_input = ticker_input.get("ticker", "")
     return str(ticker_input).strip().upper()
+
+
+def _quantize_dividend_amount(value: Decimal) -> Decimal:
+    return value.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
 @tool
 def register_asset_position(
@@ -75,6 +80,120 @@ def list_all_transactions(limit: Annotated[Optional[int], "The maximum number of
             return response.json()
     except httpx.HTTPStatusError as e:
         return f"Error: {e.response.text}"
+
+
+@tool
+def register_dividend(
+    ticker: Annotated[str, "The stock ticker symbol, e.g., 'PETR4.SA'."],
+    amount_per_share: Annotated[Optional[Decimal], "Dividend amount per share."] = None,
+    total_amount: Annotated[Optional[Decimal], "Total dividend amount received."] = None,
+    share_count: Annotated[Optional[Decimal], "Share count used to compute per-share amount."] = None,
+    payment_date: Annotated[Optional[date], "Dividend payment date."] = None,
+) -> dict:
+    """Registers a dividend for an existing asset by ticker."""
+    normalized_ticker = _parse_ticker_from_input(ticker)
+    if not normalized_ticker:
+        return {"status": "error", "message": "Ticker is required.", "data": None}
+
+    if amount_per_share is not None and total_amount is not None:
+        return {
+            "status": "error",
+            "message": "Provide either amount_per_share or total_amount, not both.",
+            "data": None,
+        }
+
+    if amount_per_share is not None and amount_per_share <= 0:
+        return {"status": "error", "message": "amount_per_share must be greater than zero.", "data": None}
+    if total_amount is not None and total_amount <= 0:
+        return {"status": "error", "message": "total_amount must be greater than zero.", "data": None}
+    if share_count is not None and share_count <= 0:
+        return {"status": "error", "message": "share_count must be greater than zero.", "data": None}
+
+    computed_amount_per_share = amount_per_share
+    fallback_payment_date = None
+
+    if total_amount is not None:
+        if share_count is None:
+            return {
+                "status": "error",
+                "message": "share_count is required when total_amount is provided.",
+                "data": None,
+            }
+        computed_amount_per_share = total_amount / share_count
+
+    if computed_amount_per_share is None:
+        fallback_amount, fallback_date = market_data_agent.get_latest_dividend(normalized_ticker)
+        if fallback_amount is None:
+            return {
+                "status": "error",
+                "message": f"No dividend history found for ticker {normalized_ticker} and no amount was provided.",
+                "data": None,
+            }
+        computed_amount_per_share = fallback_amount
+        fallback_payment_date = fallback_date
+
+    computed_amount_per_share = _quantize_dividend_amount(computed_amount_per_share)
+    effective_payment_date = payment_date or fallback_payment_date or date.today()
+
+    base_url = BASE_API_URL
+    try:
+        with httpx.Client() as client:
+            asset_response = client.get(f"{base_url}/assets/?ticker={normalized_ticker}", timeout=10.0)
+            asset_response.raise_for_status()
+            assets = asset_response.json()
+            if not assets:
+                return {
+                    "status": "error",
+                    "message": f"Asset with ticker {normalized_ticker} not found.",
+                    "data": None,
+                }
+
+            asset_id = assets[0]["id"]
+            dividend_payload = {
+                "asset_id": asset_id,
+                "amount_per_share": str(computed_amount_per_share),
+                "payment_date": str(effective_payment_date),
+            }
+            existing_response = client.get(
+                f"{base_url}/dividends/?asset_id={asset_id}&payment_date={effective_payment_date}",
+                timeout=10.0,
+            )
+            existing_response.raise_for_status()
+            existing_dividends = existing_response.json()
+
+            if existing_dividends:
+                dividend_id = existing_dividends[0]["id"]
+                update_payload = {
+                    "amount_per_share": str(computed_amount_per_share),
+                    "payment_date": str(effective_payment_date),
+                }
+                response = client.put(
+                    f"{base_url}/dividends/{dividend_id}",
+                    json=update_payload,
+                    timeout=10.0,
+                )
+                response.raise_for_status()
+            else:
+                response = client.post(f"{base_url}/dividends/", json=dividend_payload, timeout=10.0)
+                response.raise_for_status()
+            created_dividend = response.json()
+    except (httpx.HTTPStatusError, httpx.RequestError, KeyError, IndexError, ValueError) as e:
+        return {"status": "error", "message": f"An error occurred: {str(e)}", "data": None}
+
+    message = f"Dividend registered for {normalized_ticker}."
+    if amount_per_share is None and total_amount is None:
+        message = f"Dividend registered for {normalized_ticker} using latest yfinance amount_per_share."
+
+    return {
+        "status": "success",
+        "message": message,
+        "data": {
+            "ticker": normalized_ticker,
+            "asset_id": created_dividend.get("asset_id", asset_id),
+            "amount_per_share": created_dividend.get("amount_per_share", str(computed_amount_per_share)),
+            "payment_date": created_dividend.get("payment_date", str(effective_payment_date)),
+        },
+    }
 
 @tool
 def list_transactions_for_ticker(ticker: Annotated[str, "The ticker symbol to search for, e.g., 'PETR4.SA'."]) -> list[dict] | str:
@@ -194,7 +313,18 @@ def classify_agent_request(
     normalized = question.lower()
 
     keywords = {
-        "registration_agent": ["register", "add position", "new asset", "compr", "buy"],
+        "registration_agent": [
+            "register",
+            "add position",
+            "new asset",
+            "compr",
+            "buy",
+            "dividend",
+            "dividends",
+            "distribution",
+            "cash distribution",
+            "jcp",
+        ],
         "management_agent": ["update", "correct", "sell", "delete", "adjust", "fix"],
         "analysis_agent": ["analysis", "invest", "recommendation", "where should", "analyze"],
     }
