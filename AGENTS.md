@@ -124,7 +124,6 @@
 - Avoid inline styles unless necessary.
 
 ## Deployment notes
-- Render config: `render.yaml` (Docker deploy for API).
 - Health check path: `/health`.
 - If adding env vars, update `.env.sample` and docs.
 
