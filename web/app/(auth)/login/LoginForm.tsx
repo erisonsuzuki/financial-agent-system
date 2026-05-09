@@ -49,8 +49,14 @@ export default function LoginForm({ onSuccess }: Props) {
       if (mode === "magic") {
         setSuccessMessage(data.message || "Check your email for a magic link.");
       } else if (onSuccess) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("fas-auth-changed"));
+        }
         await onSuccess();
       } else {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("fas-auth-changed"));
+        }
         router.push("/dashboard");
       }
     } catch (err) {

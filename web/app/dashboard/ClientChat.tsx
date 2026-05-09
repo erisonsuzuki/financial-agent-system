@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import ChatInput from "@/app/components/ChatInput";
 import ActionLogTable from "@/app/components/ActionLogTable";
@@ -87,6 +87,31 @@ export default function ClientChat({ initialLogs, initialAuth }: ClientChatProps
       setRefreshingPrices(false);
     }
   };
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setLogs([]);
+      return;
+    }
+
+    const loadLogs = async () => {
+      try {
+        const res = await fetch("/api/agent-actions", {
+          cache: "no-store",
+          credentials: "include",
+        });
+        if (!res.ok) {
+          return;
+        }
+        const data = (await res.json()) as AgentAction[];
+        setLogs(data);
+      } catch {
+        return;
+      }
+    };
+
+    void loadLogs();
+  }, [isAuthenticated]);
 
   return (
     <section className="grid gap-6">
