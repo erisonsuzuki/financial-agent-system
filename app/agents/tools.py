@@ -1,6 +1,6 @@
 import os
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 from typing import Annotated, Optional, List, Any
 
 import httpx
@@ -22,20 +22,46 @@ def _parse_ticker_from_input(ticker_input: Any) -> str:
 def _quantize_dividend_amount(value: Decimal) -> Decimal:
     return value.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
+
+def _normalize_decimal_input(value: Any) -> Decimal:
+    if isinstance(value, Decimal):
+        return value
+    if isinstance(value, (int, float)):
+        return Decimal(str(value))
+    if isinstance(value, str):
+        normalized = value.strip().replace(" ", "")
+        if "," in normalized and "." in normalized:
+            normalized = normalized.replace(".", "").replace(",", ".")
+        elif "," in normalized:
+            normalized = normalized.replace(",", ".")
+        return Decimal(normalized)
+    if isinstance(value, (list, tuple)) and len(value) == 2:
+        return Decimal(f"{value[0]}.{value[1]}")
+    raise ValueError("average_price must be a number or decimal-like string")
+
 @tool
 def register_asset_position(
     ticker: Annotated[str, "The stock ticker symbol, e.g., 'PETR4.SA'."],
     quantity: Annotated[float, "The total quantity the user holds."],
-    average_price: Annotated[Decimal, "The user's average purchase price for this asset."]
+    average_price: Annotated[Any, "The user's average purchase price for this asset."]
 ) -> dict:
     """Registers a user's complete position for a single asset."""
     ticker = _parse_ticker_from_input(ticker)
+    try:
+        parsed_average_price = _normalize_decimal_input(average_price)
+    except (InvalidOperation, ValueError, TypeError):
+        return {
+            "status": "error",
+            "ticker": ticker,
+            "message": "average_price must be a valid number (examples: 12.32 or 12,32).",
+        }
+
     base_url = BASE_API_URL
     
     asset_payload = {"ticker": ticker, "name": ticker, "asset_type": "STOCK"}
     transaction_payload = {
         "quantity": quantity,
-        "price": str(average_price),
+        "price": str(parsed_average_price),
         "transaction_date": str(date.today())
     }
 
@@ -43,7 +69,8 @@ def register_asset_position(
         with httpx.Client() as client:
             # Step 1: Attempt to create the asset
             try:
-                client.post(f"{base_url}/assets/", json=asset_payload, timeout=10.0)
+                create_asset_response = client.post(f"{base_url}/assets/", json=asset_payload, timeout=10.0)
+                create_asset_response.raise_for_status()
             except httpx.HTTPStatusError as e:
                 if e.response.status_code != 400: # 400 is expected for duplicates
                     raise e # Re-raise the error to be caught by the main block
@@ -61,10 +88,10 @@ def register_asset_position(
             response = client.post(f"{base_url}/transactions/", json=transaction_payload, timeout=10.0)
             response.raise_for_status()
 
-    except (httpx.HTTPStatusError, IndexError, KeyError) as e:
+    except (httpx.HTTPStatusError, httpx.RequestError, IndexError, KeyError) as e:
         return {"status": "error", "ticker": ticker, "message": f"An error occurred: {str(e)}"}
         
-    return {"status": "success", "ticker": ticker, "quantity": quantity, "average_price": str(average_price)}
+    return {"status": "success", "ticker": ticker, "quantity": quantity, "average_price": str(parsed_average_price)}
 
 @tool
 def list_all_transactions(limit: Annotated[Optional[int], "The maximum number of recent transactions to return."] = 100) -> List[dict] | str:
