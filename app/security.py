@@ -1,4 +1,5 @@
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, cast
 from fastapi import HTTPException, status
@@ -15,6 +16,7 @@ if not _jwt_secret:
 JWT_SECRET_KEY: str = _jwt_secret
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "60"))
+PENDING_PASSWORD_PREFIX = "__MAGIC_LINK_PENDING__"
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
@@ -25,6 +27,16 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     return pwd_hasher.hash(password)
+
+
+def get_pending_password_placeholder() -> str:
+    return f"{PENDING_PASSWORD_PREFIX}{secrets.token_urlsafe(24)}"
+
+
+def has_usable_password(password_hash: str | None) -> bool:
+    if not password_hash:
+        return False
+    return not password_hash.startswith(PENDING_PASSWORD_PREFIX)
 
 def create_access_token(data: Dict[str, Any], expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
