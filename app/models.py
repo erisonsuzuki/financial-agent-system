@@ -11,6 +11,7 @@ from sqlalchemy import (
     DateTime,
     JSON,
     UniqueConstraint,
+    Boolean,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -53,9 +54,21 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
-    password_hash = Column(String, nullable=False)
+    password_hash = Column(String, nullable=True)
     google_sub = Column(String, unique=True, nullable=True)
     actions = relationship("AgentAction", back_populates="user")
+
+
+class MagicLinkToken(Base):
+    __tablename__ = "magic_link_tokens"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, index=True, nullable=False)
+    token_hash = Column(String, unique=True, index=True, nullable=False)
+    purpose = Column(String, nullable=False, default="register")
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    setup_used = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class AgentAction(Base):
     __tablename__ = "agent_actions"
