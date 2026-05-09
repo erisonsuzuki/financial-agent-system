@@ -1,8 +1,14 @@
-up: down
+up:
 	docker compose up -d --build
 
+up-dev:
+	docker compose --profile dev up -d --build
+	
 down:
 	docker compose down
+
+down-dev:
+	docker compose --profile dev down
 
 clean:
 	docker compose down --volumes --rmi all
