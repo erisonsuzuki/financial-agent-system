@@ -58,6 +58,17 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
 * `NVIDIA_API_KEY`: Your NVIDIA API key.
 * `NVIDIA_MODEL`: The Nemotron model to use (e.g., `nvidia/nemotron-3-nano-30b-a3b`).
 * `JWT_SECRET_KEY`: Secret used to sign API access tokens.
+* `UI_BASE_URL`: Public base URL of the web app used to build magic-link callbacks (e.g., `http://localhost:3000`).
+* `SMTP_SERVER`: SMTP relay host (Brevo: `smtp-relay.brevo.com`).
+* `SMTP_PORT`: SMTP relay port (Brevo: `587`).
+* `SMTP_LOGIN`: Brevo SMTP login (e.g., `seu_login@smtp-brevo.com`).
+* `SMTP_KEY`: Brevo SMTP key used for SMTP authentication.
+* `SMTP_FROM_EMAIL`: Verified sender email used in magic-link emails.
+* `SMTP_FROM_NAME`: Sender display name shown in the inbox.
+* `SMTP_TIMEOUT_SECONDS`: SMTP connection timeout in seconds.
+* `MAGIC_LINK_EXPIRE_MINUTES`: Magic-link expiration window in minutes.
+* `MAGIC_LINK_COOLDOWN_SECONDS`: Cooldown between link requests for the same email.
+* `MAGIC_LINK_SETUP_EXPIRE_MINUTES`: Expiration window for first-time password setup token.
 * `FASTAPI_BASE_URL`: (optional for standalone web deployments) Public URL where the FastAPI service can be reached.
 * `INTERNAL_API_URL`: Base URL that agents use when they call the FastAPI service (defaults to `http://app:8000`; set to `http://localhost:8000` when running outside Docker).
 
@@ -72,6 +83,12 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
 - Requires the backend to run at `http://localhost:8000` (automatically configured when using `make up`). When hosting separately, set `FASTAPI_BASE_URL` for the web app so it knows where to reach the API.
 
 ### API Endpoints & Agent Interaction
+
+### Authentication
+* `POST /auth/register/magic-link`: Request a magic link by email.
+* `POST /auth/register/magic-link/consume`: Consume a magic link token.
+* `POST /auth/register/magic-link/set-password`: Set first password after magic-link registration.
+* `POST /auth/login`: Sign in with email/password (for users with password already configured).
 
 ### AI Agent
 * `POST /agent/query/{agent_name}`: Send a natural language query to a specific AI agent.
@@ -104,8 +121,10 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
 * `GET /assets/{ticker}/analysis`: Retrieve a complete financial analysis for an asset.
 
 ## Common Commands
-- `make up`: Build and start all services (with hot reloading).
-- `make down`: Stop and remove all services.
+- `make up`: Build and start the production-like stack (`api`, `web`, `db`) on `http://localhost:3000`.
+- `make up-dev`: Build and start services plus `web-dev` profile (Next.js dev server on `http://localhost:3001` with hot reload).
+- `make down`: Stop and remove the default production-like stack.
+- `make down-dev`: Stop and remove the stack started with the `dev` profile.
 - `make clean`: Stop services, remove containers, volumes, and images for this project.
 - `make logs`: View the logs from all running services.
 - `make shell`: Access the shell of the running application container.

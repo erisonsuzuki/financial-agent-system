@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface Props {
   onSuccess?: () => void | Promise<void>;
 }
 
-export default function LoginForm({ onSuccess: _onSuccess }: Props) {
+type SignInMode = "password" | "magic";
+
+export default function LoginForm({ onSuccess }: Props) {
+  const router = useRouter();
+  const [mode, setMode] = useState<SignInMode>("magic");
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,12 +23,21 @@ export default function LoginForm({ onSuccess: _onSuccess }: Props) {
     setLoading(true);
     const formData = new FormData(event.currentTarget);
     try {
-      const res = await fetch("/api/auth/register", {
+      const endpoint = mode === "password" ? "/api/auth/login" : "/api/auth/register";
+      const body =
+        mode === "password"
+          ? {
+              email: formData.get("email"),
+              password: formData.get("password"),
+            }
+          : {
+              email: formData.get("email"),
+            };
+
+      const res = await fetch(endpoint, {
         method: "POST",
         credentials: "include",
-        body: JSON.stringify({
-          email: formData.get("email"),
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -32,7 +46,13 @@ export default function LoginForm({ onSuccess: _onSuccess }: Props) {
       }
 
       const data = await res.json();
-      setSuccessMessage(data.message || "Check your email for a magic link.");
+      if (mode === "magic") {
+        setSuccessMessage(data.message || "Check your email for a magic link.");
+      } else if (onSuccess) {
+        await onSuccess();
+      } else {
+        router.push("/dashboard");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unexpected error");
     } finally {
@@ -42,6 +62,34 @@ export default function LoginForm({ onSuccess: _onSuccess }: Props) {
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
+      <div className="grid grid-cols-2 gap-2 rounded-md border border-slate-700 bg-slate-900 p-1">
+        <button
+          type="button"
+          onClick={() => {
+            setMode("magic");
+            setError(null);
+            setSuccessMessage(null);
+          }}
+          className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+            mode === "magic" ? "bg-sky-500 text-white" : "text-slate-300 hover:bg-slate-800"
+          }`}
+        >
+          Magic Link
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setMode("password");
+            setError(null);
+            setSuccessMessage(null);
+          }}
+          className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+            mode === "password" ? "bg-sky-500 text-white" : "text-slate-300 hover:bg-slate-800"
+          }`}
+        >
+          Email + Password
+        </button>
+      </div>
       <div>
         <label className="block text-sm font-medium mb-1">Email</label>
         <input
@@ -51,6 +99,17 @@ export default function LoginForm({ onSuccess: _onSuccess }: Props) {
           required
         />
       </div>
+      {mode === "password" && (
+        <div>
+          <label className="block text-sm font-medium mb-1">Password</label>
+          <input
+            type="password"
+            name="password"
+            className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2"
+            required
+          />
+        </div>
+      )}
       {error && <p className="text-sm text-rose-400">{error}</p>}
       {successMessage && <p className="text-sm text-emerald-400">{successMessage}</p>}
       <button
@@ -58,7 +117,7 @@ export default function LoginForm({ onSuccess: _onSuccess }: Props) {
         className="w-full rounded-md bg-sky-500 py-2 font-semibold text-white hover:bg-sky-400 disabled:opacity-50"
         disabled={loading}
       >
-        {loading ? "Sending link..." : "Send magic link"}
+        {loading ? "Please wait..." : mode === "magic" ? "Send magic link" : "Sign in"}
       </button>
     </form>
   );

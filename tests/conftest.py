@@ -11,6 +11,8 @@ os.environ["JWT_SECRET_KEY"] = "test-secret-key-with-at-least-32-bytes"
 
 from app.main import app
 from app.database import Base, get_db
+from app import crud
+from app.security import get_password_hash, create_access_token
 
 # Use an in-memory SQLite database for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
@@ -47,12 +49,12 @@ def client(db_session):
 @pytest.fixture()
 def auth_token(client):
     email = f"user-{uuid.uuid4().hex[:8]}@example.com"
-    response = client.post(
-        "/auth/register",
-        json={"email": email, "password": "strong-password"},
-    )
-    assert response.status_code == 201
-    return response.json()["access_token"]
+    db = TestingSessionLocal()
+    try:
+        user = crud.create_user(db, email=email, password_hash=get_password_hash("strong-password"))
+        return create_access_token({"sub": str(user.id)})
+    finally:
+        db.close()
 
 @pytest.fixture()
 def auth_headers(auth_token):
