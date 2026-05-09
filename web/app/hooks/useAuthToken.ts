@@ -8,18 +8,21 @@ export function useAuthToken(initialAuth = false): boolean {
 
   useEffect(() => {
     let active = true;
+    const retryTimers: ReturnType<typeof setTimeout>[] = [];
 
     const checkSession = async () => {
       try {
         const res = await fetch("/api/auth/session", { cache: "no-store", credentials: "include" });
         const data = await res.json();
         if (!res.ok) {
-          if (active) setHasToken(false);
+          if (active && res.status === 401) {
+            setHasToken(false);
+          }
           return;
         }
         if (active) setHasToken(Boolean(data.authenticated));
-      } catch (err) {
-        if (active) setHasToken(false);
+      } catch {
+        return;
       }
     };
 
@@ -28,6 +31,8 @@ export function useAuthToken(initialAuth = false): boolean {
       // Optimistically mark as authenticated, then verify with the server.
       setHasToken(true);
       checkSession();
+      retryTimers.push(setTimeout(() => void checkSession(), 200));
+      retryTimers.push(setTimeout(() => void checkSession(), 600));
     };
     const handleFocus = () => checkSession();
 
@@ -36,10 +41,15 @@ export function useAuthToken(initialAuth = false): boolean {
 
     return () => {
       active = false;
+      retryTimers.forEach((timer) => clearTimeout(timer));
       window.removeEventListener("fas-auth-changed", handleAuthChange as EventListener);
       window.removeEventListener("focus", handleFocus);
     };
   }, []);
+
+  useEffect(() => {
+    setHasToken(initialAuth);
+  }, [initialAuth]);
 
   return hasToken;
 }
