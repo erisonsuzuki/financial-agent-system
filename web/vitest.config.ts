@@ -2,12 +2,10 @@ import { defineConfig } from "vitest/config";
 import path from "node:path";
 
 export default defineConfig({
+  cacheDir: path.resolve(__dirname, ".vitest-cache"),
   test: {
     environment: "node",
     globals: true,
-    cache: {
-      dir: path.resolve(__dirname, ".vitest-cache"),
-    },
   },
   resolve: {
     alias: {
