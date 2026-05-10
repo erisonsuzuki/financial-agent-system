@@ -1,0 +1,33 @@
+name: API Health Ping
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping-health:
+    environment: financial-agent-system
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      FASTAPI_BASE_URL: ${{ vars.FASTAPI_BASE_URL }}
+
+    steps:
+      - name: Validate FASTAPI_BASE_URL is configured
+        run: |
+          if [ -z "${FASTAPI_BASE_URL}" ]; then
+            echo "FASTAPI_BASE_URL is not set (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+
+      - name: Ping /health
+        run: |
+          set -euo pipefail
+          URL="${FASTAPI_BASE_URL%/}/health"
+          echo "Pinging ${URL}"
+          curl --fail --silent --show-error \
+            --max-time 15 \
+            --retry 2 \
+            --retry-delay 3 \
+            "${URL}"
