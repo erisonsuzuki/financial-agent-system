@@ -1,6 +1,7 @@
 "use client";
 
 import type { AssetSummary } from "@/app/hooks/useAssetSummaries";
+import { formatUtcTimestamp } from "@/app/lib/datetime";
 
 interface Props {
   assets: AssetSummary[] | undefined;
@@ -27,16 +28,7 @@ function formatPercent(value: number | null) {
 }
 
 function formatFetchedAt(value: string | null) {
-  if (!value) {
-    return "Price time unavailable";
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return "Price time unavailable";
-  }
-
-  return parsed.toLocaleString();
+  return formatUtcTimestamp(value, "Price time unavailable");
 }
 
 export default function AssetSidebar({

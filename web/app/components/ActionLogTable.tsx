@@ -1,4 +1,5 @@
 import type { AgentAction } from "@/app/types/router";
+import { formatUtcTimestamp } from "@/app/lib/datetime";
 
 interface Props {
   entries: AgentAction[];
@@ -24,7 +25,7 @@ export default function ActionLogTable({ entries }: Props) {
           {entries.map((entry) => (
             <tr key={`${entry.id}-${entry.created_at}`} className="align-top">
               <td className="px-4 py-3 text-slate-400">
-                {new Date(entry.created_at).toLocaleString()}
+                {formatUtcTimestamp(entry.created_at)}
               </td>
               <td className="px-4 py-3 font-semibold text-sky-300 break-words">{entry.agent_name}</td>
               <td className="px-4 py-3 text-slate-200 max-w-xs">
