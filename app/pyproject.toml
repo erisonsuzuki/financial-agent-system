@@ -23,7 +23,7 @@ email-validator = "^2.1.1"
 starlette = "0.49.1"
 langchain-core = "^1.2.11"
 langchain-text-splitters = "^1.0"
-pyjwt = {version = "^2.10.1", extras = ["crypto"]}
+pyjwt = {version = "2.12.0", extras = ["crypto"]}
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.2.2,<10.0.0"
