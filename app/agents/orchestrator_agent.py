@@ -4,7 +4,7 @@ from typing import Optional, cast
 
 import httpx
 from dotenv import load_dotenv
-from langchain.agents import create_agent
+from langchain_core.load.load import Reviver
 
 from . import tools, config_loader
 
@@ -16,6 +16,12 @@ PROVIDER_MODEL_ENV = {
     "groq": "GROQ_MODEL",
     "nvidia": "NVIDIA_MODEL",
 }
+
+
+def configure_langgraph_reviver() -> None:
+    from langgraph.checkpoint.serde import jsonplus
+
+    jsonplus.LC_REVIVER = Reviver(allowed_objects="core")
 
 def resolve_model_name(provider: str, default_model: Optional[str] = None) -> str:
     env_key = PROVIDER_MODEL_ENV.get(provider)
@@ -46,6 +52,9 @@ def get_llm(llm_config: dict):
     raise ValueError(f"Unsupported LLM provider: {provider}")
 
 def create_agent_executor(agent_name: str, config: Optional[dict] = None, provider_override: Optional[str] = None):
+    configure_langgraph_reviver()
+    from langchain.agents import create_agent
+
     if config is None:
         config = config_loader.load_config(agent_name)
     
