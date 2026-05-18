@@ -12,6 +12,7 @@ router = APIRouter(
     tags=["Assets"],
 )
 
+
 @router.post("/", response_model=schemas.Asset, status_code=status.HTTP_201_CREATED)
 def create_new_asset(
     asset: schemas.AssetCreate,
@@ -22,6 +23,7 @@ def create_new_asset(
     if db_asset:
         raise HTTPException(status_code=400, detail="Asset with this ticker already exists")
     return crud.create_asset(db=db, asset=asset, portfolio_id=portfolio.id)
+
 
 @router.get("/", response_model=List[schemas.Asset])
 def list_assets(
@@ -34,10 +36,12 @@ def list_assets(
     assets = crud.get_assets(db, ticker=ticker, skip=skip, limit=limit, portfolio_id=portfolio.id)
     return assets
 
+
 @router.get("/{asset_id}", response_model=schemas.Asset)
 def read_asset(asset_id: int, db: Session = Depends(get_db), portfolio: models.Portfolio = Depends(get_current_portfolio)):
     db_asset = crud.get_asset(db, asset_id=asset_id, portfolio_id=portfolio.id)
     return require_found(db_asset, "Asset not found")
+
 
 @router.put("/{asset_id}", response_model=schemas.Asset)
 def update_existing_asset(asset_id: int, asset_in: schemas.AssetUpdate, db: Session = Depends(get_db), portfolio: models.Portfolio = Depends(get_current_portfolio)):
@@ -45,10 +49,12 @@ def update_existing_asset(asset_id: int, asset_in: schemas.AssetUpdate, db: Sess
     require_found(db_asset, "Asset not found")
     return crud.update_asset(db=db, db_asset=db_asset, asset_in=asset_in)
 
+
 @router.delete("/{asset_id}", response_model=schemas.Asset)
 def delete_existing_asset(asset_id: int, db: Session = Depends(get_db), portfolio: models.Portfolio = Depends(get_current_portfolio)):
     db_asset = crud.delete_asset(db, asset_id=asset_id, portfolio_id=portfolio.id)
     return require_found(db_asset, "Asset not found")
+
 
 @router.get("/{ticker}/price", response_model=schemas.AssetPrice)
 def get_asset_price(ticker: str, refresh: bool = False, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
@@ -64,13 +70,15 @@ def get_asset_price(ticker: str, refresh: bool = False, db: Session = Depends(ge
         is_stale=is_stale,
     )
 
+
 @router.get("/{ticker}/analysis", response_model=schemas.AssetAnalysis)
 def get_asset_analysis(ticker: str, refresh: bool = False, db: Session = Depends(get_db), portfolio: models.Portfolio = Depends(get_current_portfolio)):
     db_asset = crud.get_asset_by_ticker(db, ticker=ticker, portfolio_id=portfolio.id)
     require_found(db_asset, "Asset not found")
-    
+
     analysis = portfolio_analyzer_agent.analyze_asset(db=db, asset=db_asset, refresh=refresh)
     return analysis
+
 
 @router.get("/{asset_id}/transactions", response_model=List[schemas.Transaction])
 def list_transactions_for_asset(asset_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), portfolio: models.Portfolio = Depends(get_current_portfolio)):

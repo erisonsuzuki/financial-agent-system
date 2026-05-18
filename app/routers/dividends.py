@@ -12,6 +12,7 @@ router = APIRouter(
     tags=["Dividends"],
 )
 
+
 @router.post("/", response_model=schemas.Dividend, status_code=status.HTTP_201_CREATED)
 def add_dividend(
     dividend: schemas.DividendCreate,
@@ -41,10 +42,12 @@ def list_dividends(
         portfolio_id=portfolio.id,
     )
 
+
 @router.get("/{dividend_id}", response_model=schemas.Dividend)
 def read_dividend(dividend_id: int, db: Session = Depends(get_db), portfolio: models.Portfolio = Depends(get_current_portfolio)):
     db_dividend = crud.get_dividend(db, dividend_id=dividend_id, portfolio_id=portfolio.id)
     return require_found(db_dividend, "Dividend not found")
+
 
 @router.put("/{dividend_id}", response_model=schemas.Dividend)
 def update_existing_dividend(
@@ -56,6 +59,7 @@ def update_existing_dividend(
     db_dividend = crud.get_dividend(db, dividend_id=dividend_id, portfolio_id=portfolio.id)
     require_found(db_dividend, "Dividend not found")
     return crud.update_dividend(db=db, db_dividend=db_dividend, dividend_in=dividend_in)
+
 
 @router.delete("/{dividend_id}", response_model=schemas.Dividend)
 def delete_existing_dividend(dividend_id: int, db: Session = Depends(get_db), portfolio: models.Portfolio = Depends(get_current_portfolio)):
