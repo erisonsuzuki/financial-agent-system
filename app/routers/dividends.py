@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import date
-from app import crud, schemas
+from app import crud, schemas, models
 from app.database import get_db
+from app.dependencies import get_current_user
 
 router = APIRouter(
     prefix="/dividends",
@@ -11,12 +12,16 @@ router = APIRouter(
 )
 
 @router.post("/", response_model=schemas.Dividend, status_code=status.HTTP_201_CREATED)
-def add_dividend(dividend: schemas.DividendCreate, db: Session = Depends(get_db)):
-    # Check if asset exists
-    db_asset = crud.get_asset(db, asset_id=dividend.asset_id)
+def add_dividend(
+    dividend: schemas.DividendCreate,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    portfolio = crud.get_or_create_default_portfolio(db, user.id)
+    db_asset = crud.get_asset(db, asset_id=dividend.asset_id, portfolio_id=portfolio.id)
     if not db_asset:
         raise HTTPException(status_code=404, detail="Asset not found")
-    return crud.create_asset_dividend(db=db, dividend=dividend)
+    return crud.create_asset_dividend(db=db, dividend=dividend, portfolio_id=portfolio.id)
 
 
 @router.get("/", response_model=List[schemas.Dividend])
@@ -26,32 +31,43 @@ def list_dividends(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
 ):
+    portfolio = crud.get_or_create_default_portfolio(db, user.id)
     return crud.get_dividends(
         db=db,
         asset_id=asset_id,
         payment_date=payment_date,
         skip=skip,
         limit=limit,
+        portfolio_id=portfolio.id,
     )
 
 @router.get("/{dividend_id}", response_model=schemas.Dividend)
-def read_dividend(dividend_id: int, db: Session = Depends(get_db)):
-    db_dividend = crud.get_dividend(db, dividend_id=dividend_id)
+def read_dividend(dividend_id: int, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+    portfolio = crud.get_or_create_default_portfolio(db, user.id)
+    db_dividend = crud.get_dividend(db, dividend_id=dividend_id, portfolio_id=portfolio.id)
     if db_dividend is None:
         raise HTTPException(status_code=404, detail="Dividend not found")
     return db_dividend
 
 @router.put("/{dividend_id}", response_model=schemas.Dividend)
-def update_existing_dividend(dividend_id: int, dividend_in: schemas.DividendUpdate, db: Session = Depends(get_db)):
-    db_dividend = crud.get_dividend(db, dividend_id=dividend_id)
+def update_existing_dividend(
+    dividend_id: int,
+    dividend_in: schemas.DividendUpdate,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    portfolio = crud.get_or_create_default_portfolio(db, user.id)
+    db_dividend = crud.get_dividend(db, dividend_id=dividend_id, portfolio_id=portfolio.id)
     if not db_dividend:
         raise HTTPException(status_code=404, detail="Dividend not found")
     return crud.update_dividend(db=db, db_dividend=db_dividend, dividend_in=dividend_in)
 
 @router.delete("/{dividend_id}", response_model=schemas.Dividend)
-def delete_existing_dividend(dividend_id: int, db: Session = Depends(get_db)):
-    db_dividend = crud.delete_dividend(db, dividend_id=dividend_id)
+def delete_existing_dividend(dividend_id: int, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+    portfolio = crud.get_or_create_default_portfolio(db, user.id)
+    db_dividend = crud.delete_dividend(db, dividend_id=dividend_id, portfolio_id=portfolio.id)
     if not db_dividend:
         raise HTTPException(status_code=404, detail="Dividend not found")
     return db_dividend
