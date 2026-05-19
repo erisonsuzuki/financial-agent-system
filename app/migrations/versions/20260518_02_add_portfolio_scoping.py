@@ -20,6 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     bind = op.get_bind()
+    inspector = sa.inspect(bind)
     op.create_table(
         "portfolios",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -117,11 +118,25 @@ def upgrade() -> None:
             )
         )
 
+    assets_uniques = inspector.get_unique_constraints("assets") or []
+    ticker_unique_names = [
+        uc["name"]
+        for uc in assets_uniques
+        if uc.get("name")
+        and [column.lower() for column in (uc.get("column_names") or [])] == ["ticker"]
+    ]
+    has_portfolio_ticker_unique = any(
+        [column.lower() for column in (uc.get("column_names") or [])] == ["portfolio_id", "ticker"]
+        for uc in assets_uniques
+    )
+
     with op.batch_alter_table("assets") as batch_op:
         batch_op.alter_column("portfolio_id", existing_type=sa.Integer(), nullable=False)
         batch_op.create_foreign_key("fk_assets_portfolio_id", "portfolios", ["portfolio_id"], ["id"])
-        batch_op.drop_constraint("uq_assets_ticker", type_="unique")
-        batch_op.create_unique_constraint("uq_assets_portfolio_ticker", ["portfolio_id", "ticker"])
+        for unique_name in ticker_unique_names:
+            batch_op.drop_constraint(unique_name, type_="unique")
+        if not has_portfolio_ticker_unique:
+            batch_op.create_unique_constraint("uq_assets_portfolio_ticker", ["portfolio_id", "ticker"])
 
     with op.batch_alter_table("transactions") as batch_op:
         batch_op.alter_column("portfolio_id", existing_type=sa.Integer(), nullable=False)
