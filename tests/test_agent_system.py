@@ -174,3 +174,14 @@ def test_agent_query_requires_authentication(no_auth_client: TestClient):
         json={"question": "test question"},
     )
     assert response.status_code == 401
+
+
+def test_agent_query_internal_error_is_generic(client: TestClient):
+    with patch("app.agents.orchestrator_agent.invoke_agent", side_effect=RuntimeError("secret details")):
+        response = client.post(
+            "/agent/query/registration_agent",
+            json={"question": "test question"},
+        )
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Internal server error"}

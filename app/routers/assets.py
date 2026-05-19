@@ -4,7 +4,8 @@ from typing import List, Optional
 from app import crud, schemas, models
 from app.database import get_db
 from app.agents import market_data_agent, portfolio_analyzer_agent
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_current_portfolio
+from app.routers.utils import require_found
 
 router = APIRouter(
     prefix="/assets",
@@ -12,8 +13,11 @@ router = APIRouter(
 )
 
 @router.post("/", response_model=schemas.Asset, status_code=status.HTTP_201_CREATED)
-def create_new_asset(asset: schemas.AssetCreate, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
-    portfolio = crud.get_or_create_default_portfolio(db, user.id)
+def create_new_asset(
+    asset: schemas.AssetCreate,
+    db: Session = Depends(get_db),
+    portfolio: models.Portfolio = Depends(get_current_portfolio),
+):
     db_asset = crud.get_asset_by_ticker(db, ticker=asset.ticker, portfolio_id=portfolio.id)
     if db_asset:
         raise HTTPException(status_code=400, detail="Asset with this ticker already exists")
@@ -25,35 +29,26 @@ def list_assets(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    user: models.User = Depends(get_current_user),
+    portfolio: models.Portfolio = Depends(get_current_portfolio),
 ):
-    portfolio = crud.get_or_create_default_portfolio(db, user.id)
     assets = crud.get_assets(db, ticker=ticker, skip=skip, limit=limit, portfolio_id=portfolio.id)
     return assets
 
 @router.get("/{asset_id}", response_model=schemas.Asset)
-def read_asset(asset_id: int, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
-    portfolio = crud.get_or_create_default_portfolio(db, user.id)
+def read_asset(asset_id: int, db: Session = Depends(get_db), portfolio: models.Portfolio = Depends(get_current_portfolio)):
     db_asset = crud.get_asset(db, asset_id=asset_id, portfolio_id=portfolio.id)
-    if db_asset is None:
-        raise HTTPException(status_code=404, detail="Asset not found")
-    return db_asset
+    return require_found(db_asset, "Asset not found")
 
 @router.put("/{asset_id}", response_model=schemas.Asset)
-def update_existing_asset(asset_id: int, asset_in: schemas.AssetUpdate, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
-    portfolio = crud.get_or_create_default_portfolio(db, user.id)
+def update_existing_asset(asset_id: int, asset_in: schemas.AssetUpdate, db: Session = Depends(get_db), portfolio: models.Portfolio = Depends(get_current_portfolio)):
     db_asset = crud.get_asset(db, asset_id=asset_id, portfolio_id=portfolio.id)
-    if not db_asset:
-        raise HTTPException(status_code=404, detail="Asset not found")
+    require_found(db_asset, "Asset not found")
     return crud.update_asset(db=db, db_asset=db_asset, asset_in=asset_in)
 
 @router.delete("/{asset_id}", response_model=schemas.Asset)
-def delete_existing_asset(asset_id: int, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
-    portfolio = crud.get_or_create_default_portfolio(db, user.id)
+def delete_existing_asset(asset_id: int, db: Session = Depends(get_db), portfolio: models.Portfolio = Depends(get_current_portfolio)):
     db_asset = crud.delete_asset(db, asset_id=asset_id, portfolio_id=portfolio.id)
-    if not db_asset:
-        raise HTTPException(status_code=404, detail="Asset not found")
-    return db_asset
+    return require_found(db_asset, "Asset not found")
 
 @router.get("/{ticker}/price", response_model=schemas.AssetPrice)
 def get_asset_price(ticker: str, refresh: bool = False, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
@@ -70,20 +65,16 @@ def get_asset_price(ticker: str, refresh: bool = False, db: Session = Depends(ge
     )
 
 @router.get("/{ticker}/analysis", response_model=schemas.AssetAnalysis)
-def get_asset_analysis(ticker: str, refresh: bool = False, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
-    portfolio = crud.get_or_create_default_portfolio(db, user.id)
+def get_asset_analysis(ticker: str, refresh: bool = False, db: Session = Depends(get_db), portfolio: models.Portfolio = Depends(get_current_portfolio)):
     db_asset = crud.get_asset_by_ticker(db, ticker=ticker, portfolio_id=portfolio.id)
-    if db_asset is None:
-        raise HTTPException(status_code=404, detail="Asset not found")
+    require_found(db_asset, "Asset not found")
     
     analysis = portfolio_analyzer_agent.analyze_asset(db=db, asset=db_asset, refresh=refresh)
     return analysis
 
 @router.get("/{asset_id}/transactions", response_model=List[schemas.Transaction])
-def list_transactions_for_asset(asset_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
-    portfolio = crud.get_or_create_default_portfolio(db, user.id)
+def list_transactions_for_asset(asset_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), portfolio: models.Portfolio = Depends(get_current_portfolio)):
     db_asset = crud.get_asset(db, asset_id=asset_id, portfolio_id=portfolio.id)
-    if db_asset is None:
-        raise HTTPException(status_code=404, detail="Asset not found")
+    require_found(db_asset, "Asset not found")
     transactions = crud.get_transactions(db=db, asset_id=asset_id, skip=skip, limit=limit, portfolio_id=portfolio.id)
     return transactions
