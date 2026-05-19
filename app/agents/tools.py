@@ -1,19 +1,15 @@
-import os
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 from typing import Annotated, Optional, List, Any
 
-import httpx
 from langchain.tools import tool
-from app.agents import market_data_agent
 
-BASE_API_URL = os.getenv("INTERNAL_API_URL", "http://app:8000")
+from app import crud, schemas
+from app.agents import market_data_agent, portfolio_analyzer_agent
+from app.agents.tool_context import get_tool_context
+
 
 def _parse_ticker_from_input(ticker_input: Any) -> str:
-    """
-    Sanitizes the ticker input, which might come as a string or a dict from the LLM.
-    It also converts the ticker to uppercase for consistency.
-    """
     if isinstance(ticker_input, dict):
         ticker_input = ticker_input.get("ticker", "")
     return str(ticker_input).strip().upper()
@@ -39,74 +35,69 @@ def _normalize_decimal_input(value: Any) -> Decimal:
         return Decimal(f"{value[0]}.{value[1]}")
     raise ValueError("average_price must be a number or decimal-like string")
 
+
+def _require_context():
+    context = get_tool_context()
+    if context is None:
+        raise ValueError("Tool context is required for this operation")
+    return context
+
+
 @tool
 def register_asset_position(
     ticker: Annotated[str, "The stock ticker symbol, e.g., 'PETR4.SA'."],
     quantity: Annotated[float, "The total quantity the user holds."],
-    average_price: Annotated[Any, "The user's average purchase price for this asset."]
+    average_price: Annotated[Any, "The user's average purchase price for this asset."],
 ) -> dict:
-    """Registers a user's complete position for a single asset."""
+    """Register a full position for an asset in the active portfolio."""
     ticker = _parse_ticker_from_input(ticker)
     try:
         parsed_average_price = _normalize_decimal_input(average_price)
-    except (InvalidOperation, ValueError, TypeError):
-        return {
-            "status": "error",
-            "ticker": ticker,
-            "message": "average_price must be a valid number (examples: 12.32 or 12,32).",
-        }
+        context = _require_context()
+    except (InvalidOperation, ValueError, TypeError) as exc:
+        return {"status": "error", "ticker": ticker, "message": str(exc)}
 
-    base_url = BASE_API_URL
-    
-    asset_payload = {"ticker": ticker, "name": ticker, "asset_type": "STOCK"}
-    transaction_payload = {
-        "quantity": quantity,
-        "price": str(parsed_average_price),
-        "transaction_date": str(date.today())
-    }
+    db = context.db_session
+    asset = crud.get_asset_by_ticker(db, ticker=ticker, portfolio_id=context.portfolio_id)
+    if asset is None:
+        asset = crud.create_asset(
+            db=db,
+            asset=schemas.AssetCreate(ticker=ticker, name=ticker, asset_type="STOCK"),
+            portfolio_id=context.portfolio_id,
+        )
 
-    try:
-        with httpx.Client() as client:
-            # Step 1: Attempt to create the asset
-            try:
-                create_asset_response = client.post(f"{base_url}/assets/", json=asset_payload, timeout=10.0)
-                create_asset_response.raise_for_status()
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code != 400: # 400 is expected for duplicates
-                    raise e # Re-raise the error to be caught by the main block
-
-            # Step 2: Fetch the Asset ID (newly created or already existing)
-            asset_response = client.get(f"{base_url}/assets/?ticker={ticker}", timeout=10.0)
-            asset_response.raise_for_status()
-            assets = asset_response.json()
-            if not assets:
-                return {"status": "error", "ticker": ticker, "message": f"Asset with ticker {ticker} not found after creation attempt."}
-            asset_id = assets[0]['id']
-
-            # Step 3: Create the initial synthetic transaction with the Asset ID
-            transaction_payload['asset_id'] = asset_id
-            response = client.post(f"{base_url}/transactions/", json=transaction_payload, timeout=10.0)
-            response.raise_for_status()
-
-    except (httpx.HTTPStatusError, httpx.RequestError, IndexError, KeyError) as e:
-        return {"status": "error", "ticker": ticker, "message": f"An error occurred: {str(e)}"}
-        
+    crud.create_asset_transaction(
+        db=db,
+        transaction=schemas.TransactionCreate(
+            asset_id=asset.id,
+            quantity=quantity,
+            price=parsed_average_price,
+            transaction_date=date.today(),
+        ),
+        portfolio_id=context.portfolio_id,
+    )
     return {"status": "success", "ticker": ticker, "quantity": quantity, "average_price": str(parsed_average_price)}
+
 
 @tool
 def list_all_transactions(limit: Annotated[Optional[int], "The maximum number of recent transactions to return."] = 100) -> List[dict] | str:
-    """
-    Lists recent transactions across all assets in the portfolio.
-    Useful for general questions like 'what was my last transaction?'.
-    """
-    base_url = BASE_API_URL
+    """List recent transactions for the active portfolio."""
     try:
-        with httpx.Client() as client:
-            response = client.get(f"{base_url}/transactions/?limit={limit}", timeout=10.0)
-            response.raise_for_status()
-            return response.json()
-    except httpx.HTTPStatusError as e:
-        return f"Error: {e.response.text}"
+        context = _require_context()
+        transactions = crud.get_transactions(context.db_session, limit=limit or 100, portfolio_id=context.portfolio_id)
+        return [
+            {
+                "id": tx.id,
+                "asset_id": tx.asset_id,
+                "ticker": tx.asset.ticker if tx.asset else None,
+                "quantity": tx.quantity,
+                "price": str(tx.price),
+                "transaction_date": str(tx.transaction_date),
+            }
+            for tx in transactions
+        ]
+    except ValueError as exc:
+        return f"Error: {exc}"
 
 
 @tool
@@ -117,18 +108,13 @@ def register_dividend(
     share_count: Annotated[Optional[Decimal], "Share count used to compute per-share amount."] = None,
     payment_date: Annotated[Optional[date], "Dividend payment date."] = None,
 ) -> dict:
-    """Registers a dividend for an existing asset by ticker."""
+    """Register or update a dividend by ticker in the active portfolio."""
     normalized_ticker = _parse_ticker_from_input(ticker)
     if not normalized_ticker:
         return {"status": "error", "message": "Ticker is required.", "data": None}
 
     if amount_per_share is not None and total_amount is not None:
-        return {
-            "status": "error",
-            "message": "Provide either amount_per_share or total_amount, not both.",
-            "data": None,
-        }
-
+        return {"status": "error", "message": "Provide either amount_per_share or total_amount, not both.", "data": None}
     if amount_per_share is not None and amount_per_share <= 0:
         return {"status": "error", "message": "amount_per_share must be greater than zero.", "data": None}
     if total_amount is not None and total_amount <= 0:
@@ -141,11 +127,7 @@ def register_dividend(
 
     if total_amount is not None:
         if share_count is None:
-            return {
-                "status": "error",
-                "message": "share_count is required when total_amount is provided.",
-                "data": None,
-            }
+            return {"status": "error", "message": "share_count is required when total_amount is provided.", "data": None}
         computed_amount_per_share = total_amount / share_count
 
     if computed_amount_per_share is None:
@@ -159,53 +141,44 @@ def register_dividend(
         computed_amount_per_share = fallback_amount
         fallback_payment_date = fallback_date
 
-    computed_amount_per_share = _quantize_dividend_amount(computed_amount_per_share)
-    effective_payment_date = payment_date or fallback_payment_date or date.today()
-
-    base_url = BASE_API_URL
     try:
-        with httpx.Client() as client:
-            asset_response = client.get(f"{base_url}/assets/?ticker={normalized_ticker}", timeout=10.0)
-            asset_response.raise_for_status()
-            assets = asset_response.json()
-            if not assets:
-                return {
-                    "status": "error",
-                    "message": f"Asset with ticker {normalized_ticker} not found.",
-                    "data": None,
-                }
+        context = _require_context()
+        db = context.db_session
+        asset = crud.get_asset_by_ticker(db, ticker=normalized_ticker, portfolio_id=context.portfolio_id)
+        if asset is None:
+            return {"status": "error", "message": f"Asset with ticker {normalized_ticker} not found.", "data": None}
 
-            asset_id = assets[0]["id"]
-            dividend_payload = {
-                "asset_id": asset_id,
-                "amount_per_share": str(computed_amount_per_share),
-                "payment_date": str(effective_payment_date),
-            }
-            existing_response = client.get(
-                f"{base_url}/dividends/?asset_id={asset_id}&payment_date={effective_payment_date}",
-                timeout=10.0,
+        computed_amount_per_share = _quantize_dividend_amount(computed_amount_per_share)
+        effective_payment_date = payment_date or fallback_payment_date or date.today()
+        existing = crud.get_dividends(
+            db=db,
+            asset_id=asset.id,
+            payment_date=effective_payment_date,
+            portfolio_id=context.portfolio_id,
+            limit=1,
+        )
+
+        if existing:
+            created_dividend = crud.update_dividend(
+                db=db,
+                db_dividend=existing[0],
+                dividend_in=schemas.DividendUpdate(
+                    amount_per_share=computed_amount_per_share,
+                    payment_date=effective_payment_date,
+                ),
             )
-            existing_response.raise_for_status()
-            existing_dividends = existing_response.json()
-
-            if existing_dividends:
-                dividend_id = existing_dividends[0]["id"]
-                update_payload = {
-                    "amount_per_share": str(computed_amount_per_share),
-                    "payment_date": str(effective_payment_date),
-                }
-                response = client.put(
-                    f"{base_url}/dividends/{dividend_id}",
-                    json=update_payload,
-                    timeout=10.0,
-                )
-                response.raise_for_status()
-            else:
-                response = client.post(f"{base_url}/dividends/", json=dividend_payload, timeout=10.0)
-                response.raise_for_status()
-            created_dividend = response.json()
-    except (httpx.HTTPStatusError, httpx.RequestError, KeyError, IndexError, ValueError) as e:
-        return {"status": "error", "message": f"An error occurred: {str(e)}", "data": None}
+        else:
+            created_dividend = crud.create_asset_dividend(
+                db=db,
+                dividend=schemas.DividendCreate(
+                    asset_id=asset.id,
+                    amount_per_share=computed_amount_per_share,
+                    payment_date=effective_payment_date,
+                ),
+                portfolio_id=context.portfolio_id,
+            )
+    except ValueError as exc:
+        return {"status": "error", "message": f"An error occurred: {exc}", "data": None}
 
     message = f"Dividend registered for {normalized_ticker}."
     if amount_per_share is None and total_amount is None:
@@ -216,129 +189,114 @@ def register_dividend(
         "message": message,
         "data": {
             "ticker": normalized_ticker,
-            "asset_id": created_dividend.get("asset_id", asset_id),
-            "amount_per_share": created_dividend.get("amount_per_share", str(computed_amount_per_share)),
-            "payment_date": created_dividend.get("payment_date", str(effective_payment_date)),
+            "asset_id": created_dividend.asset_id,
+            "amount_per_share": str(created_dividend.amount_per_share),
+            "payment_date": str(created_dividend.payment_date),
         },
     }
 
+
 @tool
 def list_transactions_for_ticker(ticker: Annotated[str, "The ticker symbol to search for, e.g., 'PETR4.SA'."]) -> list[dict] | str:
-    """
-    Lists all transactions for a given asset ticker. Useful for finding a specific transaction ID before updating it.
-    """
-    base_url = BASE_API_URL
+    """List transactions for a specific ticker in the active portfolio."""
     ticker = _parse_ticker_from_input(ticker)
     try:
-        with httpx.Client() as client:
-            asset_response = client.get(f"{base_url}/assets/?ticker={ticker}", timeout=10.0)
-            asset_response.raise_for_status()
-            assets = asset_response.json()
-            if not assets:
-                return f"Error: Asset with ticker {ticker} not found."
-            asset_id = assets[0]["id"]
+        context = _require_context()
+        asset = crud.get_asset_by_ticker(context.db_session, ticker=ticker, portfolio_id=context.portfolio_id)
+        if not asset:
+            return f"Error: Asset with ticker {ticker} not found."
+        transactions = crud.get_transactions_for_asset(
+            context.db_session,
+            asset_id=asset.id,
+            portfolio_id=context.portfolio_id,
+        )
+        return [
+            {
+                "id": tx.id,
+                "asset_id": tx.asset_id,
+                "quantity": tx.quantity,
+                "price": str(tx.price),
+                "transaction_date": str(tx.transaction_date),
+            }
+            for tx in transactions
+        ]
+    except ValueError as exc:
+        return f"Error: {exc}"
 
-            response = client.get(f"{base_url}/assets/{asset_id}/transactions", timeout=10.0)
-            response.raise_for_status()
-            return response.json()
-    except (httpx.HTTPStatusError, KeyError, IndexError) as e:
-        return f"Error: {str(e)}"
 
 @tool
 def update_transaction_by_id(
     transaction_id: Annotated[int, "The unique ID of the transaction to update."],
     new_quantity: Annotated[Optional[float], "The corrected quantity of the transaction."] = None,
     new_price: Annotated[Optional[Decimal], "The corrected price of the transaction."] = None,
-    new_date: Annotated[Optional[str], "The corrected date of the transaction, in 'YYYY-MM-DD' format."] = None
+    new_date: Annotated[Optional[str], "The corrected date of the transaction, in 'YYYY-MM-DD' format."] = None,
 ) -> dict | str:
-    """
-    Updates one or more fields of a specific transaction identified by its ID.
-    """
-    base_url = BASE_API_URL
+    """Update transaction fields by ID in the active portfolio."""
     update_payload = {}
     if new_quantity is not None:
         update_payload["quantity"] = new_quantity
     if new_price is not None:
-        update_payload["price"] = str(new_price)
+        update_payload["price"] = new_price
     if new_date is not None:
         update_payload["transaction_date"] = new_date
-
     if not update_payload:
         return "Error: At least one field (quantity, price, or date) must be provided to update."
 
     try:
-        with httpx.Client() as client:
-            response = client.put(f"{base_url}/transactions/{transaction_id}", json=update_payload, timeout=10.0)
-            response.raise_for_status()
-            return response.json()
-    except httpx.HTTPStatusError as e:
-        return f"Error: {e.response.text}"
+        context = _require_context()
+        db_transaction = crud.get_transaction(context.db_session, transaction_id=transaction_id, portfolio_id=context.portfolio_id)
+        if db_transaction is None:
+            return "Error: Transaction not found."
+        updated = crud.update_transaction(
+            db=context.db_session,
+            db_transaction=db_transaction,
+            transaction_in=schemas.TransactionUpdate(**update_payload),
+        )
+        return {
+            "id": updated.id,
+            "asset_id": updated.asset_id,
+            "quantity": updated.quantity,
+            "price": str(updated.price),
+            "transaction_date": str(updated.transaction_date),
+        }
+    except ValueError as exc:
+        return f"Error: {exc}"
+
 
 @tool
 def delete_asset_by_ticker(ticker: Annotated[str, "The ticker symbol of the asset to delete, e.g., 'PETR4.SA'."]) -> str:
-    """
-    Deletes an asset and all its associated transactions and dividends from the portfolio.
-    """
-    base_url = BASE_API_URL
-    # This tool is smarter: it finds the asset ID first, then calls the DELETE endpoint.
+    """Delete an asset by ticker in the active portfolio."""
     try:
-        with httpx.Client() as client:
-            # Find the asset to get its ID
-            get_response = client.get(f"{base_url}/assets/?ticker={ticker}", timeout=10.0) # Assuming a future query param
-            get_response.raise_for_status()
-            assets = get_response.json()
-            if not assets:
-                return f"Error: Asset with ticker {ticker} not found."
-            asset_id = assets[0]["id"]
-            
-            # Delete the asset by its ID
-            delete_response = client.delete(f"{base_url}/assets/{asset_id}", timeout=10.0)
-            delete_response.raise_for_status()
-            return f"Successfully deleted asset {ticker} and all its records."
-    except httpx.HTTPStatusError as e:
-        return f"Error: {e.response.text}"
+        ticker = _parse_ticker_from_input(ticker)
+        context = _require_context()
+        asset = crud.get_asset_by_ticker(context.db_session, ticker=ticker, portfolio_id=context.portfolio_id)
+        if asset is None:
+            return f"Error: Asset with ticker {ticker} not found."
+        crud.delete_asset(context.db_session, asset_id=asset.id, portfolio_id=context.portfolio_id)
+        return f"Successfully deleted asset {ticker} and all its records."
+    except ValueError as exc:
+        return f"Error: {exc}"
+
 
 @tool
 def get_full_portfolio_analysis() -> List[dict] | str:
-    """
-    Analyzes all assets in the portfolio and returns a list of their financial metrics.
-    This should be the primary tool to get an overview of the entire portfolio before making a recommendation.
-    """
-    base_url = BASE_API_URL
+    """Return analysis for all assets in the active portfolio."""
     try:
-        with httpx.Client() as client:
-            # 1. Get all assets
-            asset_response = client.get(f"{base_url}/assets/", timeout=10.0)
-            asset_response.raise_for_status()
-            assets = asset_response.json()
-            if not assets:
-                return "Error: No assets found in the portfolio to analyze."
-            
-            # 2. For each asset, get its detailed analysis
-            full_analysis = []
-            for asset in assets:
-                ticker = asset.get("ticker")
-                if not ticker:
-                    continue
-                
-                analysis_response = client.get(f"{base_url}/assets/{ticker}/analysis", timeout=10.0)
-                analysis_response.raise_for_status() # Will raise for 404s etc.
-                full_analysis.append(analysis_response.json())
-            
-            return full_analysis
-    except (httpx.HTTPStatusError, IndexError, KeyError) as e:
-        return f"An unexpected error occurred during portfolio analysis: {str(e)}"
+        context = _require_context()
+        assets = crud.get_assets(context.db_session, portfolio_id=context.portfolio_id)
+        if not assets:
+            return "Error: No assets found in the portfolio to analyze."
+        return [portfolio_analyzer_agent.analyze_asset(context.db_session, asset).model_dump(mode="json") for asset in assets]
+    except ValueError as exc:
+        return f"An unexpected error occurred during portfolio analysis: {exc}"
+
 
 @tool
 def classify_agent_request(
-    question: Annotated[str, "The original natural-language request from the user."]
+    question: Annotated[str, "The original natural-language request from the user."],
 ) -> dict:
-    """
-    Classifies the user request into registration, management, or analysis based on keyword heuristics.
-    Acts as a backup signal for the router agent when the LLM needs structured hints.
-    """
+    """Classify a request into registration, management, or analysis."""
     normalized = question.lower()
-
     keywords = {
         "registration_agent": [
             "register",
@@ -372,7 +330,6 @@ def classify_agent_request(
         if best_score
         else "No strong keyword matches; defaulting to analysis_agent."
     )
-
     return {
         "agent_name": best_agent if best_score else "analysis_agent",
         "confidence": round(confidence, 2),

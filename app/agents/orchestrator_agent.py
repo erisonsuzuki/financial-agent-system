@@ -111,13 +111,16 @@ def is_transient_llm_error(exc: Exception) -> bool:
     ]
     return any(marker in message for marker in transient_markers)
 
-def invoke_agent(agent_name: str, query: str) -> str:
+def invoke_agent(agent_name: str, query: str, context: dict | None = None) -> str:
     config = config_loader.load_config(agent_name)
     primary_provider = config.get("llm", {}).get("provider", "").lower()
     agent_executor = create_agent_executor(agent_name, config=config)
 
     try:
-        response = agent_executor.invoke({"messages": [{"role": "user", "content": query}]})
+        payload = {"messages": [{"role": "user", "content": query}]}
+        if context is not None:
+            payload["context"] = context
+        response = agent_executor.invoke(payload)
         messages = response.get("messages", [])
         if not messages:
             return "Could not process the request."
@@ -134,7 +137,10 @@ def invoke_agent(agent_name: str, query: str) -> str:
                 config=config,
                 provider_override=fallback_provider,
             )
-            response = fallback_executor.invoke({"messages": [{"role": "user", "content": query}]})
+            payload = {"messages": [{"role": "user", "content": query}]}
+            if context is not None:
+                payload["context"] = context
+            response = fallback_executor.invoke(payload)
             messages = response.get("messages", [])
             if not messages:
                 return "Could not process the request."

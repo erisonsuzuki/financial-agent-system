@@ -114,3 +114,8 @@ def test_list_all_transactions(client: TestClient, db_session):
     assert len(data) == 2
     assert data[0]["price"] == "20.00" # Sorted by date descending
     assert data[1]["price"] == "10.00"
+
+
+def test_transactions_requires_authentication(no_auth_client: TestClient):
+    response = no_auth_client.get("/transactions/")
+    assert response.status_code == 401

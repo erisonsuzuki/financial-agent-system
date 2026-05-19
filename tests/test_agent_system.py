@@ -166,3 +166,22 @@ def test_agent_query_agent_not_found(client: TestClient):
     
     assert response.status_code == 404
     assert "Agent configuration for 'nonexistent_agent' not found." in response.json()["detail"]
+
+
+def test_agent_query_requires_authentication(no_auth_client: TestClient):
+    response = no_auth_client.post(
+        "/agent/query/registration_agent",
+        json={"question": "test question"},
+    )
+    assert response.status_code == 401
+
+
+def test_agent_query_internal_error_is_generic(client: TestClient):
+    with patch("app.agents.orchestrator_agent.invoke_agent", side_effect=RuntimeError("secret details")):
+        response = client.post(
+            "/agent/query/registration_agent",
+            json={"question": "test question"},
+        )
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Internal server error"}

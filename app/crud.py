@@ -18,11 +18,12 @@ def get_user_by_email(db: Session, email: str) -> models.User | None:
 def normalize_email(email: str) -> str:
     return email.strip().lower()
 
-def create_user(db: Session, email: str, password_hash: str, google_sub: str | None = None) -> models.User:
-    db_user = models.User(email=email, password_hash=password_hash, google_sub=google_sub)
+def create_user(db: Session, email: str, password_hash: str) -> models.User:
+    db_user = models.User(email=email, password_hash=password_hash)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+    get_or_create_default_portfolio(db, db_user.id)
     return db_user
 
 
@@ -31,7 +32,35 @@ def create_user_without_password(db: Session, email: str) -> models.User:
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+    get_or_create_default_portfolio(db, db_user.id)
     return db_user
+
+
+def get_or_create_default_portfolio(db: Session, user_id: int) -> models.Portfolio:
+    portfolio = (
+        db.query(models.Portfolio)
+        .filter(models.Portfolio.user_id == user_id)
+        .order_by(models.Portfolio.id.asc())
+        .first()
+    )
+    if portfolio is not None:
+        return portfolio
+
+    portfolio = models.Portfolio(user_id=user_id, name="Default")
+    db.add(portfolio)
+    db.commit()
+    db.refresh(portfolio)
+    return portfolio
+
+
+def get_or_create_legacy_portfolio(db: Session) -> models.Portfolio:
+    existing = db.query(models.Portfolio).order_by(models.Portfolio.id.asc()).first()
+    if existing is not None:
+        return existing
+    user = get_user_by_email(db, "legacy-owner@local")
+    if user is None:
+        user = create_user(db, email="legacy-owner@local", password_hash=get_pending_password_placeholder())
+    return get_or_create_default_portfolio(db, user.id)
 
 
 def set_user_password(db: Session, user: models.User, password_hash: str) -> models.User:
@@ -104,20 +133,47 @@ def mark_magic_link_setup_used(db: Session, token: models.MagicLinkToken) -> mod
     return token
 
 # --- Asset CRUD ---
-def get_asset(db: Session, asset_id: int) -> models.Asset | None:
+def get_asset_unscoped(db: Session, asset_id: int) -> models.Asset | None:
     return db.query(models.Asset).filter(models.Asset.id == asset_id).first()
 
-def get_asset_by_ticker(db: Session, ticker: str) -> models.Asset | None:
+
+def get_asset_by_ticker_unscoped(db: Session, ticker: str) -> models.Asset | None:
     return db.query(models.Asset).filter(models.Asset.ticker == ticker).first()
 
-def get_assets(db: Session, ticker: Optional[str] = None, skip: int = 0, limit: int = 100) -> list[models.Asset]:
+
+def get_asset(db: Session, asset_id: int, portfolio_id: int | None = None) -> models.Asset | None:
+    if portfolio_id is None:
+        raise ValueError("portfolio_id is required for scoped asset queries")
+    query = db.query(models.Asset).filter(models.Asset.id == asset_id)
+    query = query.filter(models.Asset.portfolio_id == portfolio_id)
+    return query.first()
+
+def get_asset_by_ticker(db: Session, ticker: str, portfolio_id: int | None = None) -> models.Asset | None:
+    if portfolio_id is None:
+        raise ValueError("portfolio_id is required for scoped asset queries")
+    query = db.query(models.Asset).filter(models.Asset.ticker == ticker)
+    query = query.filter(models.Asset.portfolio_id == portfolio_id)
+    return query.first()
+
+def get_assets(
+    db: Session,
+    ticker: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    portfolio_id: int | None = None,
+) -> list[models.Asset]:
+    if portfolio_id is None:
+        raise ValueError("portfolio_id is required for scoped asset queries")
     query = db.query(models.Asset)
+    query = query.filter(models.Asset.portfolio_id == portfolio_id)
     if ticker is not None:
         query = query.filter(models.Asset.ticker == ticker)
     return query.offset(skip).limit(limit).all()
 
-def create_asset(db: Session, asset: schemas.AssetCreate) -> models.Asset:
-    db_asset = models.Asset(**asset.model_dump())
+def create_asset(db: Session, asset: schemas.AssetCreate, portfolio_id: int | None = None) -> models.Asset:
+    if portfolio_id is None:
+        portfolio_id = get_or_create_legacy_portfolio(db).id
+    db_asset = models.Asset(**asset.model_dump(), portfolio_id=portfolio_id)
     db.add(db_asset)
     db.commit()
     db.refresh(db_asset)
@@ -132,25 +188,49 @@ def update_asset(db: Session, db_asset: models.Asset, asset_in: schemas.AssetUpd
     db.refresh(db_asset)
     return db_asset
 
-def delete_asset(db: Session, asset_id: int) -> models.Asset:
-    db_asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
+def delete_asset(db: Session, asset_id: int, portfolio_id: int | None = None) -> models.Asset:
+    if portfolio_id is None:
+        raise ValueError("portfolio_id is required for scoped asset deletion")
+    db_asset = get_asset(db, asset_id=asset_id, portfolio_id=portfolio_id)
     if db_asset:
         db.delete(db_asset)
         db.commit()
     return db_asset
 
 # --- Transaction CRUD ---
-def get_transaction(db: Session, transaction_id: int) -> models.Transaction | None:
-    return db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+def get_transaction(db: Session, transaction_id: int, portfolio_id: int | None = None) -> models.Transaction | None:
+    if portfolio_id is None:
+        raise ValueError("portfolio_id is required for scoped transaction queries")
+    query = db.query(models.Transaction).filter(models.Transaction.id == transaction_id)
+    query = query.filter(models.Transaction.portfolio_id == portfolio_id)
+    return query.first()
 
-def get_transactions(db: Session, asset_id: Optional[int] = None, skip: int = 0, limit: int = 100) -> list[models.Transaction]:
+def get_transactions(
+    db: Session,
+    asset_id: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 100,
+    portfolio_id: int | None = None,
+) -> list[models.Transaction]:
+    if portfolio_id is None:
+        raise ValueError("portfolio_id is required for scoped transaction queries")
     query = db.query(models.Transaction).options(joinedload(models.Transaction.asset)).order_by(models.Transaction.transaction_date.desc())
+    query = query.filter(models.Transaction.portfolio_id == portfolio_id)
     if asset_id is not None:
         query = query.filter(models.Transaction.asset_id == asset_id)
     return query.offset(skip).limit(limit).all()
 
-def create_asset_transaction(db: Session, transaction: schemas.TransactionCreate) -> models.Transaction:
-    db_transaction = models.Transaction(**transaction.model_dump())
+def create_asset_transaction(
+    db: Session,
+    transaction: schemas.TransactionCreate,
+    portfolio_id: int | None = None,
+) -> models.Transaction:
+    if portfolio_id is None:
+        asset = get_asset_unscoped(db, transaction.asset_id)
+        if asset is None:
+            raise ValueError("Asset not found")
+        portfolio_id = asset.portfolio_id
+    db_transaction = models.Transaction(**transaction.model_dump(), portfolio_id=portfolio_id)
     db.add(db_transaction)
     db.commit()
     db.refresh(db_transaction)
@@ -165,19 +245,35 @@ def update_transaction(db: Session, db_transaction: models.Transaction, transact
     db.refresh(db_transaction)
     return db_transaction
 
-def delete_transaction(db: Session, transaction_id: int) -> models.Transaction:
-    db_transaction = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+def delete_transaction(db: Session, transaction_id: int, portfolio_id: int | None = None) -> models.Transaction:
+    if portfolio_id is None:
+        raise ValueError("portfolio_id is required for scoped transaction deletion")
+    db_transaction = get_transaction(db, transaction_id=transaction_id, portfolio_id=portfolio_id)
     if db_transaction:
         db.delete(db_transaction)
         db.commit()
     return db_transaction
 
-def get_transactions_for_asset(db: Session, asset_id: int, skip: int = 0, limit: int = 100) -> list[models.Transaction]:
-    return db.query(models.Transaction).filter(models.Transaction.asset_id == asset_id).offset(skip).limit(limit).all()
+def get_transactions_for_asset(
+    db: Session,
+    asset_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    portfolio_id: int | None = None,
+) -> list[models.Transaction]:
+    if portfolio_id is None:
+        raise ValueError("portfolio_id is required for scoped transaction queries")
+    query = db.query(models.Transaction).filter(models.Transaction.asset_id == asset_id)
+    query = query.filter(models.Transaction.portfolio_id == portfolio_id)
+    return query.offset(skip).limit(limit).all()
 
 # --- Dividend CRUD ---
-def get_dividend(db: Session, dividend_id: int) -> models.Dividend | None:
-    return db.query(models.Dividend).filter(models.Dividend.id == dividend_id).first()
+def get_dividend(db: Session, dividend_id: int, portfolio_id: int | None = None) -> models.Dividend | None:
+    if portfolio_id is None:
+        raise ValueError("portfolio_id is required for scoped dividend queries")
+    query = db.query(models.Dividend).filter(models.Dividend.id == dividend_id)
+    query = query.filter(models.Dividend.portfolio_id == portfolio_id)
+    return query.first()
 
 
 def get_dividends(
@@ -186,16 +282,25 @@ def get_dividends(
     payment_date: date | None = None,
     skip: int = 0,
     limit: int = 100,
+    portfolio_id: int | None = None,
 ) -> list[models.Dividend]:
+    if portfolio_id is None:
+        raise ValueError("portfolio_id is required for scoped dividend queries")
     query = db.query(models.Dividend)
+    query = query.filter(models.Dividend.portfolio_id == portfolio_id)
     if asset_id is not None:
         query = query.filter(models.Dividend.asset_id == asset_id)
     if payment_date is not None:
         query = query.filter(models.Dividend.payment_date == payment_date)
     return query.order_by(models.Dividend.payment_date.desc(), models.Dividend.id.desc()).offset(skip).limit(limit).all()
 
-def create_asset_dividend(db: Session, dividend: schemas.DividendCreate) -> models.Dividend:
-    db_dividend = models.Dividend(**dividend.model_dump())
+def create_asset_dividend(db: Session, dividend: schemas.DividendCreate, portfolio_id: int | None = None) -> models.Dividend:
+    if portfolio_id is None:
+        asset = get_asset_unscoped(db, dividend.asset_id)
+        if asset is None:
+            raise ValueError("Asset not found")
+        portfolio_id = asset.portfolio_id
+    db_dividend = models.Dividend(**dividend.model_dump(), portfolio_id=portfolio_id)
     db.add(db_dividend)
     try:
         db.commit()
@@ -221,15 +326,27 @@ def update_dividend(db: Session, db_dividend: models.Dividend, dividend_in: sche
     db.refresh(db_dividend)
     return db_dividend
 
-def delete_dividend(db: Session, dividend_id: int) -> models.Dividend:
-    db_dividend = db.query(models.Dividend).filter(models.Dividend.id == dividend_id).first()
+def delete_dividend(db: Session, dividend_id: int, portfolio_id: int | None = None) -> models.Dividend:
+    if portfolio_id is None:
+        raise ValueError("portfolio_id is required for scoped dividend deletion")
+    db_dividend = get_dividend(db, dividend_id=dividend_id, portfolio_id=portfolio_id)
     if db_dividend:
         db.delete(db_dividend)
         db.commit()
     return db_dividend
 
-def get_dividends_for_asset(db: Session, asset_id: int, skip: int = 0, limit: int = 100) -> list[models.Dividend]:
-    return db.query(models.Dividend).filter(models.Dividend.asset_id == asset_id).offset(skip).limit(limit).all()
+def get_dividends_for_asset(
+    db: Session,
+    asset_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    portfolio_id: int | None = None,
+) -> list[models.Dividend]:
+    if portfolio_id is None:
+        raise ValueError("portfolio_id is required for scoped dividend queries")
+    query = db.query(models.Dividend).filter(models.Dividend.asset_id == asset_id)
+    query = query.filter(models.Dividend.portfolio_id == portfolio_id)
+    return query.offset(skip).limit(limit).all()
 
 
 def get_latest_dividend_for_asset(db: Session, asset_id: int) -> models.Dividend | None:

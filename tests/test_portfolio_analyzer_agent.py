@@ -67,7 +67,12 @@ def test_analyze_asset_refresh_sync_inserts_new_dividend(db_session: Session):
 
         portfolio_analyzer_agent.analyze_asset(db=db_session, asset=asset, refresh=True)
 
-    dividends = crud.get_dividends_for_asset(db=db_session, asset_id=asset.id, limit=10)
+    dividends = crud.get_dividends_for_asset(
+        db=db_session,
+        asset_id=asset.id,
+        limit=10,
+        portfolio_id=asset.portfolio_id,
+    )
     assert len(dividends) == 1
     assert Decimal(str(dividends[0].amount_per_share)) == Decimal("0.7777")
     assert dividends[0].payment_date == date(2026, 1, 5)
@@ -93,7 +98,12 @@ def test_analyze_asset_refresh_sync_updates_same_date_dividend(db_session: Sessi
 
         portfolio_analyzer_agent.analyze_asset(db=db_session, asset=asset, refresh=True)
 
-    dividends = crud.get_dividends_for_asset(db=db_session, asset_id=asset.id, limit=10)
+    dividends = crud.get_dividends_for_asset(
+        db=db_session,
+        asset_id=asset.id,
+        limit=10,
+        portfolio_id=asset.portfolio_id,
+    )
     assert len(dividends) == 1
     assert Decimal(str(dividends[0].amount_per_share)) == Decimal("0.2500")
 
@@ -118,7 +128,12 @@ def test_analyze_asset_refresh_sync_skips_same_date_and_amount(db_session: Sessi
 
         portfolio_analyzer_agent.analyze_asset(db=db_session, asset=asset, refresh=True)
 
-    dividends = crud.get_dividends_for_asset(db=db_session, asset_id=asset.id, limit=10)
+    dividends = crud.get_dividends_for_asset(
+        db=db_session,
+        asset_id=asset.id,
+        limit=10,
+        portfolio_id=asset.portfolio_id,
+    )
     assert len(dividends) == 1
     assert Decimal(str(dividends[0].amount_per_share)) == Decimal("0.3300")
 
@@ -143,7 +158,12 @@ def test_analyze_asset_refresh_sync_skips_older_external_dividend(db_session: Se
 
         portfolio_analyzer_agent.analyze_asset(db=db_session, asset=asset, refresh=True)
 
-    dividends = crud.get_dividends_for_asset(db=db_session, asset_id=asset.id, limit=10)
+    dividends = crud.get_dividends_for_asset(
+        db=db_session,
+        asset_id=asset.id,
+        limit=10,
+        portfolio_id=asset.portfolio_id,
+    )
     assert len(dividends) == 1
     assert dividends[0].payment_date == date(2026, 5, 20)
     assert Decimal(str(dividends[0].amount_per_share)) == Decimal("0.4000")

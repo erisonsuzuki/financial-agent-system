@@ -43,6 +43,24 @@ def client(db_session):
             db_session.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    test_client = TestClient(app)
+    email = f"user-{uuid.uuid4().hex[:8]}@example.com"
+    user = crud.create_user(db_session, email=email, password_hash=get_password_hash("strong-password"))
+    token = create_access_token({"sub": str(user.id)})
+    test_client.headers.update({"Authorization": f"Bearer {token}"})
+    yield test_client
+    del app.dependency_overrides[get_db]
+
+
+@pytest.fixture()
+def no_auth_client(db_session):
+    def override_get_db():
+        try:
+            yield db_session
+        finally:
+            db_session.close()
+
+    app.dependency_overrides[get_db] = override_get_db
     yield TestClient(app)
     del app.dependency_overrides[get_db]
 

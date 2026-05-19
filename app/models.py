@@ -24,18 +24,32 @@ class AssetType(str, enum.Enum):
 
 class Asset(Base):
     __tablename__ = "assets"
+    __table_args__ = (UniqueConstraint("portfolio_id", "ticker", name="uq_assets_portfolio_ticker"),)
     id = Column(Integer, primary_key=True, index=True)
-    ticker = Column(String, unique=True, index=True, nullable=False)
+    ticker = Column(String, index=True, nullable=False)
     name = Column(String, nullable=False)
     asset_type = Column(SQLAlchemyEnum(AssetType), nullable=False)
     sector = Column(String)
+    portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False, index=True)
+    portfolio = relationship("Portfolio", back_populates="assets")
     transactions = relationship("Transaction", back_populates="asset")
     dividends = relationship("Dividend", back_populates="asset")
+
+
+class Portfolio(Base):
+    __tablename__ = "portfolios"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String, nullable=False, default="Default")
+
+    user = relationship("User", back_populates="portfolios")
+    assets = relationship("Asset", back_populates="portfolio")
 
 class Transaction(Base):
     __tablename__ = "transactions"
     id = Column(Integer, primary_key=True, index=True)
     asset_id = Column(Integer, ForeignKey("assets.id"), nullable=False)
+    portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False, index=True)
     quantity = Column(Float, nullable=False)
     price = Column(Numeric(10, 2), nullable=False)
     transaction_date = Column(Date, nullable=False)
@@ -46,6 +60,7 @@ class Dividend(Base):
     __table_args__ = (UniqueConstraint("asset_id", "payment_date", name="uq_dividends_asset_id_payment_date"),)
     id = Column(Integer, primary_key=True, index=True)
     asset_id = Column(Integer, ForeignKey("assets.id"), nullable=False)
+    portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False, index=True)
     amount_per_share = Column(Numeric(10, 4), nullable=False)
     payment_date = Column(Date, nullable=False)
     asset = relationship("Asset", back_populates="dividends")
@@ -55,8 +70,8 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=True)
-    google_sub = Column(String, unique=True, nullable=True)
     actions = relationship("AgentAction", back_populates="user")
+    portfolios = relationship("Portfolio", back_populates="user")
 
 
 class MagicLinkToken(Base):

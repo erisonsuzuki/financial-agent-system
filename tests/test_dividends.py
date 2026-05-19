@@ -137,3 +137,8 @@ def test_create_dividend_same_date_is_idempotent(client: TestClient):
     list_response = client.get(f"/dividends/?asset_id={asset_id}&payment_date=2026-06-30")
     assert list_response.status_code == 200
     assert len(list_response.json()) == 1
+
+
+def test_dividends_requires_authentication(no_auth_client: TestClient):
+    response = no_auth_client.get("/dividends/")
+    assert response.status_code == 401
