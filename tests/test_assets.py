@@ -139,3 +139,8 @@ def test_get_asset_analysis_passes_refresh_flag(client: TestClient, db_session):
     called_kwargs = mock_analyze.call_args.kwargs
     assert called_kwargs["db"] == db_session
     assert called_kwargs["refresh"] is True
+
+
+def test_assets_requires_authentication(no_auth_client: TestClient):
+    response = no_auth_client.get("/assets/")
+    assert response.status_code == 401

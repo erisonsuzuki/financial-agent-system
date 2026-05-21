@@ -42,10 +42,20 @@ def analyze_asset(db: Session, asset: models.Asset, refresh: bool = False) -> sc
     """
     Performs a complete financial analysis for a single asset using Decimal for precision.
     """
-    transactions = crud.get_transactions(db=db, asset_id=asset.id, limit=10000)
+    transactions = crud.get_transactions(
+        db=db,
+        asset_id=asset.id,
+        limit=10000,
+        portfolio_id=asset.portfolio_id,
+    )
     if refresh:
         _sync_latest_dividend_for_asset(db=db, asset=asset)
-    dividends = crud.get_dividends_for_asset(db=db, asset_id=asset.id, limit=10000)
+    dividends = crud.get_dividends_for_asset(
+        db=db,
+        asset_id=asset.id,
+        limit=10000,
+        portfolio_id=asset.portfolio_id,
+    )
 
     total_quantity = sum(Decimal(str(t.quantity)) for t in transactions)
     
