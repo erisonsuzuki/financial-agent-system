@@ -22,11 +22,12 @@ argon2-cffi = "^23.1.0"
 email-validator = "^2.1.1"
 starlette = "0.49.1"
 langchain-core = "^1.2.11"
-langchain-text-splitters = "^1.0"
-pyjwt = {version = "^2.10.1", extras = ["crypto"]}
+langchain-text-splitters = "1.1.2"
+pyjwt = {version = "2.12.0", extras = ["crypto"]}
+alembic = "^1.16.5"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.2.2"
+pytest = ">=8.2.2,<10.0.0"
 respx = "^0.21.0"
 pip-audit = "^2.7.3"
 wheel = "^0.46.2"

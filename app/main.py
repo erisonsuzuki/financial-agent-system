@@ -6,38 +6,8 @@ from sqlalchemy import text
 from app.logging_config import setup_logging
 setup_logging()
 
-from app import models
 from app.database import engine, SessionLocal
 from app.routers import assets, transactions, dividends, agent, agent_actions, auth
-
-models.Base.metadata.create_all(bind=engine)
-
-
-def ensure_dividend_uniqueness_constraint() -> None:
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                """
-                DELETE FROM dividends
-                WHERE id NOT IN (
-                    SELECT MAX(id)
-                    FROM dividends
-                    GROUP BY asset_id, payment_date
-                )
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_dividends_asset_id_payment_date
-                ON dividends (asset_id, payment_date)
-                """
-            )
-        )
-
-
-ensure_dividend_uniqueness_constraint()
 
 app = FastAPI(
     title="Financial Agent System",

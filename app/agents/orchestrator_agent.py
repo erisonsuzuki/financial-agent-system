@@ -4,7 +4,7 @@ from typing import Optional, cast
 
 import httpx
 from dotenv import load_dotenv
-from langchain.agents import create_agent
+from langchain_core.load.load import Reviver
 
 from . import tools, config_loader
 
@@ -16,6 +16,12 @@ PROVIDER_MODEL_ENV = {
     "groq": "GROQ_MODEL",
     "nvidia": "NVIDIA_MODEL",
 }
+
+
+def configure_langgraph_reviver() -> None:
+    from langgraph.checkpoint.serde import jsonplus
+
+    jsonplus.LC_REVIVER = Reviver(allowed_objects="core")
 
 def resolve_model_name(provider: str, default_model: Optional[str] = None) -> str:
     env_key = PROVIDER_MODEL_ENV.get(provider)
@@ -46,6 +52,9 @@ def get_llm(llm_config: dict):
     raise ValueError(f"Unsupported LLM provider: {provider}")
 
 def create_agent_executor(agent_name: str, config: Optional[dict] = None, provider_override: Optional[str] = None):
+    configure_langgraph_reviver()
+    from langchain.agents import create_agent
+
     if config is None:
         config = config_loader.load_config(agent_name)
     
@@ -102,13 +111,16 @@ def is_transient_llm_error(exc: Exception) -> bool:
     ]
     return any(marker in message for marker in transient_markers)
 
-def invoke_agent(agent_name: str, query: str) -> str:
+def invoke_agent(agent_name: str, query: str, context: dict | None = None) -> str:
     config = config_loader.load_config(agent_name)
     primary_provider = config.get("llm", {}).get("provider", "").lower()
     agent_executor = create_agent_executor(agent_name, config=config)
 
     try:
-        response = agent_executor.invoke({"messages": [{"role": "user", "content": query}]})
+        payload = {"messages": [{"role": "user", "content": query}]}
+        if context is not None:
+            payload["context"] = context
+        response = agent_executor.invoke(payload)
         messages = response.get("messages", [])
         if not messages:
             return "Could not process the request."
@@ -125,7 +137,10 @@ def invoke_agent(agent_name: str, query: str) -> str:
                 config=config,
                 provider_override=fallback_provider,
             )
-            response = fallback_executor.invoke({"messages": [{"role": "user", "content": query}]})
+            payload = {"messages": [{"role": "user", "content": query}]}
+            if context is not None:
+                payload["context"] = context
+            response = fallback_executor.invoke(payload)
             messages = response.get("messages", [])
             if not messages:
                 return "Could not process the request."

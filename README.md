@@ -70,7 +70,6 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
 * `MAGIC_LINK_COOLDOWN_SECONDS`: Cooldown between link requests for the same email.
 * `MAGIC_LINK_SETUP_EXPIRE_MINUTES`: Expiration window for first-time password setup token.
 * `FASTAPI_BASE_URL`: (optional for standalone web deployments) Public URL where the FastAPI service can be reached.
-* `INTERNAL_API_URL`: Base URL that agents use when they call the FastAPI service (defaults to `http://app:8000`; set to `http://localhost:8000` when running outside Docker).
 
 ### Setup and Running
 1.  **Build and Run the Application:** Use `make up`. Docker Compose builds and starts the API (`http://localhost:8000`), the Web UI (`http://localhost:3000`), and PostgreSQL with one command.
@@ -91,7 +90,8 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
 * `POST /auth/login`: Sign in with email/password (for users with password already configured).
 
 ### AI Agent
-* `POST /agent/query/{agent_name}`: Send a natural language query to a specific AI agent.
+* `POST /agent/query/router`: Preferred endpoint. Routes requests to the correct agent (authenticated).
+* `POST /agent/query/{agent_name}`: Transitional endpoint, authenticated, planned for removal after migration.
   * **Registration Agent (`registration_agent`):**
     `make agent-register q="Register: 100 ITSA4 at R$10.50"`
   * **Management Agent (`management_agent`):**
@@ -100,6 +100,7 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
     `make agent-analyze q="Where should I invest R$1000 this month?"`
 
 ### Data Management
+All endpoints below require authentication and are scoped to the authenticated user's portfolio.
 * `POST /assets/`: Create a new financial asset.
 * `GET /assets/`: List all assets (can filter by `ticker`).
 * `GET /assets/{asset_id}`: Retrieve an asset by its ID.
@@ -130,9 +131,14 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
 - `make shell`: Access the shell of the running application container.
 - `make db-shell`: Connect to a PostgreSQL shell inside the database container.
 - `make test`: Run the unit test suite.
+- `make migrate-check`: Show current DB migration revision and Alembic head.
+- `make migrate`: Apply Alembic migrations only when DB is behind head (no implicit schema stamping).
+- `make migrate-stamp`: Explicitly stamp legacy schema to head when DB has tables but no Alembic version.
 - `make lint`: Run web lint.
 - `make audit`: Run security audits for both API and web.
 - `make web-test`: Run web tests (Vitest).
 - `make agent-register q="..."`: Send a query to the registration agent.
 - `make agent-manage q="..."`: Send a query to the management agent.
 - `make agent-analyze q="..."`: Send a query to the analysis agent.
+
+For agent Makefile commands, pass a token: `make agent-register AUTH_TOKEN=<jwt> q="..."`.

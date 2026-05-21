@@ -17,9 +17,10 @@ RUN poetry config virtualenvs.create false && poetry lock && poetry install --no
 
 # Copy the rest of the application code
 COPY ./app /code/app
+RUN chmod +x /code/app/scripts/start-api.sh
 
 # Set the working directory back to the parent
 WORKDIR /code
 
-# Command to run the application as a module
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run migrations before starting API
+CMD ["/code/app/scripts/start-api.sh"]
