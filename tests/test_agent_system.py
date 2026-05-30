@@ -34,31 +34,17 @@ def test_load_config_missing_env_var(tmp_path):
     with pytest.raises(ValueError, match="Environment variable 'A_VAR_THAT_DOES_NOT_EXIST' not found"):
         config_loader.load_config("test_agent", base_path=tmp_path)
 
-def test_load_config_llm_model_resolution_groq(tmp_path, monkeypatch):
+def test_load_config_llm_model_resolution(tmp_path, monkeypatch):
     config_dir = tmp_path / "configs"
     config_dir.mkdir()
     config_file = config_dir / "test_agent.yaml"
     config_file.write_text("model_name: ${LLM_MODEL}\n")
 
-    monkeypatch.setenv("LLM_PROVIDER", "groq")
-    monkeypatch.setenv("GROQ_MODEL", "openai/gpt-oss-20b")
+    monkeypatch.setenv("MAIN_MODEL", "openai/gpt-oss-120b")
 
     config = config_loader.load_config("test_agent", base_path=tmp_path)
 
-    assert config["model_name"] == "openai/gpt-oss-20b"
-
-def test_load_config_llm_model_resolution_nvidia(tmp_path, monkeypatch):
-    config_dir = tmp_path / "configs"
-    config_dir.mkdir()
-    config_file = config_dir / "test_agent.yaml"
-    config_file.write_text("model_name: ${LLM_MODEL}\n")
-
-    monkeypatch.setenv("LLM_PROVIDER", "nvidia")
-    monkeypatch.setenv("NVIDIA_MODEL", "nvidia/nemotron-3-nano-30b-a3b")
-
-    config = config_loader.load_config("test_agent", base_path=tmp_path)
-
-    assert config["model_name"] == "nvidia/nemotron-3-nano-30b-a3b"
+    assert config["model_name"] == "openai/gpt-oss-120b"
 
 def test_invoke_agent_fallback_on_transient_error(monkeypatch):
     from app.agents import orchestrator_agent
@@ -66,16 +52,15 @@ def test_invoke_agent_fallback_on_transient_error(monkeypatch):
     config = {
         "llm": {
             "provider": "groq",
-            "model_name": "openai/gpt-oss-20b",
+            "model_name": "openai/gpt-oss-120b",
             "temperature": 0.0,
         },
         "tools": [],
     }
 
     monkeypatch.setenv("LLM_PROVIDER", "groq")
-    monkeypatch.setenv("LLM_FALLBACK_PROVIDER", "nvidia")
-    monkeypatch.setenv("GROQ_MODEL", "openai/gpt-oss-20b")
-    monkeypatch.setenv("NVIDIA_MODEL", "nvidia/nemotron-3-nano-30b-a3b")
+    monkeypatch.setenv("MAIN_MODEL", "openai/gpt-oss-120b")
+    monkeypatch.setenv("FALLBACK_MODEL", "openai/gpt-oss-20b")
 
     monkeypatch.setattr(orchestrator_agent.config_loader, "load_config", lambda _: config)
 
@@ -96,7 +81,7 @@ def test_invoke_agent_fallback_on_transient_error(monkeypatch):
 
     calls = []
 
-    def fake_create_agent_executor(agent_name, config=None, provider_override=None):
+    def fake_create_agent_executor(agent_name, config=None, provider_override=None, model_name_override=None):
         calls.append(provider_override)
         if provider_override is None:
             return PrimaryExecutor()
@@ -107,7 +92,7 @@ def test_invoke_agent_fallback_on_transient_error(monkeypatch):
     result = orchestrator_agent.invoke_agent("test_agent", "hello")
 
     assert result == "fallback"
-    assert calls == [None, "nvidia"]
+    assert calls == [None, "groq"]
 
 def test_invoke_agent_no_fallback_on_non_transient_error(monkeypatch):
     from app.agents import orchestrator_agent
@@ -115,16 +100,15 @@ def test_invoke_agent_no_fallback_on_non_transient_error(monkeypatch):
     config = {
         "llm": {
             "provider": "groq",
-            "model_name": "openai/gpt-oss-20b",
+            "model_name": "openai/gpt-oss-120b",
             "temperature": 0.0,
         },
         "tools": [],
     }
 
     monkeypatch.setenv("LLM_PROVIDER", "groq")
-    monkeypatch.setenv("LLM_FALLBACK_PROVIDER", "nvidia")
-    monkeypatch.setenv("GROQ_MODEL", "openai/gpt-oss-20b")
-    monkeypatch.setenv("NVIDIA_MODEL", "nvidia/nemotron-3-nano-30b-a3b")
+    monkeypatch.setenv("MAIN_MODEL", "openai/gpt-oss-120b")
+    monkeypatch.setenv("FALLBACK_MODEL", "openai/gpt-oss-20b")
 
     monkeypatch.setattr(orchestrator_agent.config_loader, "load_config", lambda _: config)
 
@@ -134,7 +118,7 @@ def test_invoke_agent_no_fallback_on_non_transient_error(monkeypatch):
 
     calls = []
 
-    def fake_create_agent_executor(agent_name, config=None, provider_override=None):
+    def fake_create_agent_executor(agent_name, config=None, provider_override=None, model_name_override=None):
         calls.append(provider_override)
         return PrimaryExecutor()
 

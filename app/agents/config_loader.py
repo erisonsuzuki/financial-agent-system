@@ -27,18 +27,10 @@ def load_config(agent_name: str, base_path: Optional[Path] = None) -> dict:
         env_value = os.getenv(placeholder)
         if env_value is None:
             if placeholder == "LLM_MODEL":
-                provider = os.getenv("LLM_PROVIDER", "").lower()
-                provider_env_map = {
-                    "groq": "GROQ_MODEL",
-                    "nvidia": "NVIDIA_MODEL",
-                }
-                provider_env = provider_env_map.get(provider)
-                if provider_env is None:
-                    raise ValueError(f"Unsupported LLM provider: {provider}")
-                env_value = os.getenv(provider_env)
+                env_value = os.getenv("MAIN_MODEL")
                 if env_value is None:
                     raise ValueError(
-                        f"Environment variable '{provider_env}' not found and is required for provider '{provider}'."
+                        "Environment variable 'MAIN_MODEL' not found and is required for 'LLM_MODEL'."
                     )
 
             if env_value is None:

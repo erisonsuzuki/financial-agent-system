@@ -34,3 +34,18 @@ def test_register_dividend_success_with_amount_per_share(db_session):
 def test_classify_agent_request_routes_dividend_query_to_registration():
     result = classify_agent_request.invoke({"question": "Please register a cash dividend of 50 BRL for HGCR11"})
     assert result["agent_name"] == "registration_agent"
+
+
+def test_classify_agent_request_routes_portuguese_registration_query():
+    result = classify_agent_request.invoke({"question": "Registre 400 ITSA4 com PM R$ 9,32"})
+    assert result["agent_name"] == "registration_agent"
+
+
+def test_classify_agent_request_routes_spanish_management_query():
+    result = classify_agent_request.invoke({"question": "Por favor, corregir la transaccion de ITSA4"})
+    assert result["agent_name"] == "management_agent"
+
+
+def test_classify_agent_request_routes_portuguese_analysis_query():
+    result = classify_agent_request.invoke({"question": "Onde devo investir este mes?"})
+    assert result["agent_name"] == "analysis_agent"

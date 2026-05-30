@@ -13,8 +13,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 PROVIDER_MODEL_ENV = {
-    "groq": "GROQ_MODEL",
-    "nvidia": "NVIDIA_MODEL",
+    "groq": "MAIN_MODEL",
 }
 
 
@@ -43,15 +42,14 @@ def get_llm(llm_config: dict):
             model=model_name,
             temperature=temperature,
         )
-    if provider == "nvidia":
-        from langchain_nvidia_ai_endpoints import ChatNVIDIA
-        return ChatNVIDIA(
-            model=model_name,
-            temperature=temperature,
-        )
     raise ValueError(f"Unsupported LLM provider: {provider}")
 
-def create_agent_executor(agent_name: str, config: Optional[dict] = None, provider_override: Optional[str] = None):
+def create_agent_executor(
+    agent_name: str,
+    config: Optional[dict] = None,
+    provider_override: Optional[str] = None,
+    model_name_override: Optional[str] = None,
+):
     configure_langgraph_reviver()
     from langchain.agents import create_agent
 
@@ -65,6 +63,8 @@ def create_agent_executor(agent_name: str, config: Optional[dict] = None, provid
         provider_override = provider_override.lower()
         llm_config["provider"] = provider_override
         llm_config["model_name"] = resolve_model_name(provider_override, llm_config.get("model_name"))
+    if model_name_override:
+        llm_config["model_name"] = model_name_override
 
     llm = get_llm(llm_config)
 
@@ -126,16 +126,18 @@ def invoke_agent(agent_name: str, query: str, context: dict | None = None) -> st
             return "Could not process the request."
         return messages[-1].content
     except Exception as exc:
-        fallback_provider = os.getenv("LLM_FALLBACK_PROVIDER", "nvidia").lower()
+        fallback_model = os.getenv("FALLBACK_MODEL", "").strip()
+        primary_model = str(config.get("llm", {}).get("model_name", "")).strip()
         if (
-            fallback_provider
-            and fallback_provider != primary_provider
+            fallback_model
+            and fallback_model != primary_model
             and is_transient_llm_error(exc)
         ):
             fallback_executor = create_agent_executor(
                 agent_name,
                 config=config,
-                provider_override=fallback_provider,
+                provider_override=primary_provider,
+                model_name_override=fallback_model,
             )
             payload = {"messages": [{"role": "user", "content": query}]}
             if context is not None:
