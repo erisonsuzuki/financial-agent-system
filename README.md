@@ -29,12 +29,13 @@ graph TD
 * **Tools (`tools.py`):** These are the specific Python functions that the LLM can decide to call. They act as the agent's "hands and eyes," allowing it to interact with our API, databases, or external services.
 
 ### Execution Flow
-1.  A user sends a query to a named agent (e.g., `registration_agent`).
-2.  The Orchestrator loads the corresponding `.yaml` config file.
-3.  It combines the user's query with the prompt and tool definitions and sends them to the LLM.
-4.  The LLM analyzes the request and decides which tool(s) to call and with which arguments.
-5.  The Orchestrator executes the chosen tools (e.g., calls our own API to save data).
-6.  The LLM receives the results from the tools and formulates a final, natural language answer for the user.
+1.  A user sends a query to the router endpoint (`/agent/query/router`).
+2.  The router classifies intent with a deterministic classifier (`classify_agent_request`) and selects `registration_agent`, `management_agent`, or `analysis_agent`.
+3.  The Orchestrator loads the selected agent's `.yaml` config file.
+4.  It combines the user's query with the prompt and tool definitions and sends them to the LLM.
+5.  The LLM analyzes the request and decides which tool(s) to call and with which arguments.
+6.  The Orchestrator executes the chosen tools (e.g., calls our own API to save data).
+7.  The LLM receives the results from the tools and formulates a final, natural language answer for the user.
 
 ## Tech Stack
 - **Language:** Python 3.11+
@@ -51,12 +52,10 @@ graph TD
 ### Environment Variables
 Before running the application, copy `.env.sample` to `.env` and fill in the values:
 * `POSTGRES_...`: Your database credentials.
-* `LLM_PROVIDER`: The AI provider to use. Can be `groq` or `nvidia`.
-* `LLM_FALLBACK_PROVIDER`: Provider to use when the primary fails (defaults to `nvidia`).
+* `LLM_PROVIDER`: The AI provider to use (`groq`).
+* `MAIN_MODEL`: Primary model to use (e.g., `openai/gpt-oss-120b`).
+* `FALLBACK_MODEL`: Fallback model used after transient failures (e.g., `openai/gpt-oss-20b`).
 * `GROQ_API_KEY`: Your Groq API key.
-* `GROQ_MODEL`: The Groq model to use (e.g., `openai/gpt-oss-20b`).
-* `NVIDIA_API_KEY`: Your NVIDIA API key.
-* `NVIDIA_MODEL`: The Nemotron model to use (e.g., `nvidia/nemotron-3-nano-30b-a3b`).
 * `JWT_SECRET_KEY`: Secret used to sign API access tokens.
 * `UI_BASE_URL`: Public base URL of the web app used to build magic-link callbacks (e.g., `http://localhost:3000`).
 * `SMTP_SERVER`: SMTP relay host (Brevo: `smtp-relay.brevo.com`).
@@ -90,7 +89,7 @@ Before running the application, copy `.env.sample` to `.env` and fill in the val
 * `POST /auth/login`: Sign in with email/password (for users with password already configured).
 
 ### AI Agent
-* `POST /agent/query/router`: Preferred endpoint. Routes requests to the correct agent (authenticated).
+* `POST /agent/query/router`: Preferred endpoint. Uses deterministic intent classification to route requests to the correct agent (authenticated).
 * `POST /agent/query/{agent_name}`: Transitional endpoint, authenticated, planned for removal after migration.
   * **Registration Agent (`registration_agent`):**
     `make agent-register q="Register: 100 ITSA4 at R$10.50"`

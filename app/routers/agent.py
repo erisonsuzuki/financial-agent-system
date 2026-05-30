@@ -1,9 +1,8 @@
-import json
 import logging
-import re
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.agents import orchestrator_agent
+from app.agents.tools import classify_agent_request
 from app import crud, schemas
 from app.database import get_db
 from app.dependencies import get_current_user
@@ -11,25 +10,36 @@ from app.agents.tool_context import ToolContext, set_tool_context, reset_tool_co
 
 logger = logging.getLogger(__name__)
 
+ALLOWED_ROUTER_AGENTS = {"registration_agent", "management_agent", "analysis_agent"}
+
 router = APIRouter(
     prefix="/agent",
     tags=["AI Agent"],
 )
 
-def _parse_router_classification(raw_output: str) -> dict:
-    try:
-        return json.loads(raw_output)
-    except json.JSONDecodeError:
-        for match in re.finditer(r"\{[\s\S]*?\}", raw_output):
-            try:
-                return json.loads(match.group(0))
-            except json.JSONDecodeError:
-                continue
+def _normalize_router_classification(classification: dict) -> dict:
+    agent_name = classification.get("agent_name")
+    confidence = classification.get("confidence")
+    reasoning = classification.get("reasoning")
+
+    if agent_name not in ALLOWED_ROUTER_AGENTS:
         return {
             "agent_name": "analysis_agent",
             "confidence": None,
-            "reasoning": "Router output was not valid JSON; defaulted to analysis_agent.",
+            "reasoning": "Router output had invalid agent_name; defaulted to analysis_agent.",
         }
+
+    if confidence is not None and not isinstance(confidence, (int, float)):
+        confidence = None
+
+    if not isinstance(reasoning, str) or not reasoning.strip():
+        reasoning = "Router output missing reasoning; preserved selected agent."
+
+    return {
+        "agent_name": agent_name,
+        "confidence": confidence,
+        "reasoning": reasoning,
+    }
 
 @router.post("/query/router", response_model=schemas.AgentResponseWithMetadata)
 def handle_router_query(
@@ -42,8 +52,9 @@ def handle_router_query(
         ToolContext(user_id=user.id, portfolio_id=portfolio.id, db_session=db)
     )
     try:
-        raw_classification = orchestrator_agent.invoke_agent("router_agent", query.question)
-        classification = _parse_router_classification(raw_classification)
+        classification = _normalize_router_classification(
+            classify_agent_request.invoke({"question": query.question})
+        )
 
         agent_name = classification.get("agent_name") or "analysis_agent"
         agent_answer = orchestrator_agent.invoke_agent(agent_name, query.question)
