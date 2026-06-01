@@ -119,6 +119,11 @@ All endpoints below require authentication and are scoped to the authenticated u
 ### Analysis Endpoints
 * `GET /assets/{ticker}/price`: Retrieve the current market price for an asset.
 * `GET /assets/{ticker}/analysis`: Retrieve a complete financial analysis for an asset.
+* `GET /assets/summary`: Retrieve summary analysis for all assets in the authenticated portfolio.
+
+Ticker resolution notes:
+- Brazilian B3 tickers without exchange suffix (for example, `PETR4`) are resolved by trying `.SA` first, then the raw ticker as fallback.
+- Tickers that already include exchange suffixes continue to work as-is.
 
 ## Common Commands
 - `make up`: Build and start the production-like stack (`api`, `web`, `db`) on `http://localhost:3000`.
