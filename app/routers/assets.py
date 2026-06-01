@@ -1,3 +1,4 @@
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -35,6 +36,66 @@ def list_assets(
 ):
     assets = crud.get_assets(db, ticker=ticker, skip=skip, limit=limit, portfolio_id=portfolio.id)
     return assets
+
+
+@router.get("/summary", response_model=List[schemas.AssetSummary])
+def list_assets_summary(
+    refresh: bool = False,
+    db: Session = Depends(get_db),
+    portfolio: models.Portfolio = Depends(get_current_portfolio),
+):
+    assets = crud.get_assets(db, portfolio_id=portfolio.id)
+    results: list[schemas.AssetSummary] = []
+
+    for asset in assets:
+        try:
+            analysis = portfolio_analyzer_agent.analyze_asset(db=db, asset=asset, refresh=refresh)
+            total_return_value = None
+            total_return_percent = None
+
+            if analysis.financial_return_value is not None:
+                total_return_value = analysis.financial_return_value + analysis.total_dividends_received
+                if analysis.total_invested > 0:
+                    total_return_percent = ((total_return_value / analysis.total_invested) * Decimal("100")).quantize(Decimal("0.01"))
+
+            results.append(
+                schemas.AssetSummary(
+                    id=asset.id,
+                    name=asset.name,
+                    ticker=asset.ticker,
+                    units=analysis.total_quantity,
+                    average_price=analysis.average_price,
+                    current_price=analysis.current_market_price,
+                    pl_value=analysis.financial_return_value,
+                    pl_percent=analysis.financial_return_percent,
+                    dividends=analysis.total_dividends_received,
+                    total_return_value=total_return_value,
+                    total_return_percent=total_return_percent,
+                    price_fetched_at=analysis.fetched_at,
+                    is_stale=analysis.is_stale,
+                )
+            )
+        except Exception:
+            results.append(
+                schemas.AssetSummary(
+                    id=asset.id,
+                    name=asset.name,
+                    ticker=asset.ticker,
+                    units=0,
+                    average_price=Decimal("0.00"),
+                    current_price=None,
+                    pl_value=None,
+                    pl_percent=None,
+                    dividends=Decimal("0.00"),
+                    total_return_value=None,
+                    total_return_percent=None,
+                    price_fetched_at=None,
+                    is_stale=False,
+                    error="analysis_unavailable",
+                )
+            )
+
+    return results
 
 
 @router.get("/{asset_id}", response_model=schemas.Asset)

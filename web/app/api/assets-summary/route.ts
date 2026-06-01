@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fastapiFetch } from "@/app/lib/fas-api";
 
-type Asset = { id: number; ticker: string; name: string };
-type AssetAnalysis = {
-  total_quantity: number;
+type BackendAssetSummary = {
+  id: number;
+  name: string;
+  ticker: string;
+  units: number;
   average_price: string;
-  current_market_price: string | null;
-  financial_return_value: string | null;
-  financial_return_percent: string | null;
-  total_dividends_received?: string | null;
-  total_return_value?: string | null;
-  total_return_percent?: string | null;
-  fetched_at?: string | null;
-  is_stale?: boolean;
+  current_price: string | null;
+  pl_value: string | null;
+  pl_percent: string | null;
+  dividends: string;
+  total_return_value: string | null;
+  total_return_percent: string | null;
+  price_fetched_at: string | null;
+  is_stale: boolean;
+  error?: string | null;
 };
 type AssetSummary = {
   id: number;
@@ -42,7 +45,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const assets = await fastapiFetch<Asset[]>("/assets/", {
+    const summaryPath = refresh ? "/assets/summary?refresh=true" : "/assets/summary";
+    const assets = await fastapiFetch<BackendAssetSummary[]>(summaryPath, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
@@ -50,51 +54,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([]);
     }
 
-    const enriched = await Promise.all(
-      assets.map(async (asset): Promise<AssetSummary> => {
-        try {
-          const analysisPath = refresh
-            ? `/assets/${asset.ticker}/analysis?refresh=true`
-            : `/assets/${asset.ticker}/analysis`;
-          const analysis = await fastapiFetch<AssetAnalysis>(analysisPath, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          return {
-            id: asset.id,
-            name: asset.name,
-            ticker: asset.ticker,
-            units: analysis.total_quantity,
-            averagePrice: Number(analysis.average_price),
-            currentPrice: analysis.current_market_price ? Number(analysis.current_market_price) : null,
-            plValue: analysis.financial_return_value ? Number(analysis.financial_return_value) : null,
-            plPercent: analysis.financial_return_percent ? Number(analysis.financial_return_percent) : null,
-            dividends: analysis.total_dividends_received ? Number(analysis.total_dividends_received) : 0,
-            totalReturnValue: analysis.total_return_value ? Number(analysis.total_return_value) : null,
-            totalReturnPercent: analysis.total_return_percent ? Number(analysis.total_return_percent) : null,
-            priceFetchedAt: analysis.fetched_at ?? null,
-            isStale: analysis.is_stale ?? false,
-          };
-        } catch (error) {
-          console.error(`Failed to fetch analysis for ${asset.ticker}:`, error);
-          return {
-            id: asset.id,
-            name: asset.name,
-            ticker: asset.ticker,
-            units: 0,
-            averagePrice: 0,
-            currentPrice: null,
-            plValue: null,
-            plPercent: null,
-            dividends: 0,
-            totalReturnValue: null,
-            totalReturnPercent: null,
-            priceFetchedAt: null,
-            isStale: false,
-            error: "analysis_unavailable",
-          };
-        }
-      })
-    );
+    const enriched: AssetSummary[] = assets.map((asset) => ({
+      id: asset.id,
+      name: asset.name,
+      ticker: asset.ticker,
+      units: asset.units,
+      averagePrice: Number(asset.average_price),
+      currentPrice: asset.current_price ? Number(asset.current_price) : null,
+      plValue: asset.pl_value ? Number(asset.pl_value) : null,
+      plPercent: asset.pl_percent ? Number(asset.pl_percent) : null,
+      dividends: Number(asset.dividends),
+      totalReturnValue: asset.total_return_value ? Number(asset.total_return_value) : null,
+      totalReturnPercent: asset.total_return_percent ? Number(asset.total_return_percent) : null,
+      priceFetchedAt: asset.price_fetched_at,
+      isStale: asset.is_stale,
+      error: asset.error ?? undefined,
+    }));
 
     return NextResponse.json(enriched);
   } catch (error: unknown) {
