@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from app import crud
+from app import schemas
 
 def test_create_asset_success(client: TestClient):
     response = client.post(
@@ -139,6 +140,45 @@ def test_get_asset_analysis_passes_refresh_flag(client: TestClient, db_session):
     called_kwargs = mock_analyze.call_args.kwargs
     assert called_kwargs["db"] == db_session
     assert called_kwargs["refresh"] is True
+
+
+def test_get_assets_summary_returns_bulk_analysis(client: TestClient):
+    client.post("/assets/", json={"ticker": "AAPL", "name": "APPLE", "asset_type": "STOCK"})
+    client.post("/assets/", json={"ticker": "MSFT", "name": "MICROSOFT", "asset_type": "STOCK"})
+
+    def _mock_analysis(db, asset, refresh=False):
+        if asset.ticker == "AAPL":
+            raise RuntimeError("analysis failed")
+        return schemas.AssetAnalysis(
+            ticker=asset.ticker,
+            total_quantity=10,
+            average_price=Decimal("100.00"),
+            total_invested=Decimal("1000.00"),
+            current_market_price=Decimal("120.00"),
+            current_market_value=Decimal("1200.00"),
+            financial_return_value=Decimal("200.00"),
+            financial_return_percent=Decimal("20.00"),
+            total_dividends_received=Decimal("40.00"),
+            fetched_at=None,
+            is_stale=False,
+        )
+
+    with patch("app.agents.portfolio_analyzer_agent.analyze_asset", side_effect=_mock_analysis):
+        response = client.get("/assets/summary?refresh=true")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 2
+
+    aapl = next(item for item in data if item["ticker"] == "AAPL")
+    assert aapl["error"] == "analysis_unavailable"
+
+    msft = next(item for item in data if item["ticker"] == "MSFT")
+    assert msft["units"] == 10
+    assert msft["average_price"] == "100.00"
+    assert msft["dividends"] == "40.00"
+    assert msft["total_return_value"] == "240.00"
+    assert msft["total_return_percent"] == "24.00"
 
 
 def test_assets_requires_authentication(no_auth_client: TestClient):

@@ -82,6 +82,23 @@ class AssetAnalysis(BaseModel):
     fetched_at: datetime | None = None
     is_stale: bool = False
 
+
+class AssetSummary(BaseModel):
+    id: int
+    name: str
+    ticker: str
+    units: float
+    average_price: Decimal
+    current_price: Decimal | None
+    pl_value: Decimal | None
+    pl_percent: Decimal | None
+    dividends: Decimal
+    total_return_value: Decimal | None
+    total_return_percent: Decimal | None
+    price_fetched_at: datetime | None
+    is_stale: bool = False
+    error: str | None = None
+
 # --- Agent Action Schemas ---
 class AgentActionCreate(BaseModel):
     agent_name: str
