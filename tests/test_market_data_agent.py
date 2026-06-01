@@ -1,5 +1,6 @@
 from unittest.mock import patch, MagicMock
 from app.agents import market_data_agent
+from app.agents.ticker_utils import ticker_candidates
 from decimal import Decimal
 from app import crud
 
@@ -122,3 +123,55 @@ def test_get_current_price_returns_none_when_no_db_cache_and_provider_failure(mo
 
     assert price is None
     assert is_stale is False
+
+
+def test_ticker_candidates_prioritize_b3_suffix():
+    assert list(ticker_candidates("PETR4")) == ["PETR4.SA", "PETR4"]
+
+
+def test_ticker_candidates_keep_non_b3_order():
+    assert list(ticker_candidates("AAPL")) == ["AAPL", "AAPL.SA"]
+
+
+@patch("yfinance.Ticker")
+def test_get_current_price_tries_b3_suffix_first(mock_yf_ticker):
+    market_data_agent._cache.clear()
+
+    def ticker_side_effect(symbol):
+        instance = MagicMock()
+        if symbol == "PETR4.SA":
+            instance.history.return_value = create_mock_history(42.0)
+        else:
+            instance.history.return_value = create_mock_history(None)
+        return instance
+
+    mock_yf_ticker.side_effect = ticker_side_effect
+
+    price, is_stale = market_data_agent.get_current_price("PETR4")
+
+    assert price == Decimal("42.00")
+    assert is_stale is False
+    mock_yf_ticker.assert_called_once_with("PETR4.SA")
+
+
+@patch("yfinance.Ticker")
+def test_get_latest_dividend_tries_b3_suffix_first(mock_yf_ticker):
+    import pandas as pd
+
+    mock_sa = MagicMock()
+    mock_sa.dividends = pd.Series([0.75], index=pd.to_datetime(["2026-05-20"]))
+    mock_raw = MagicMock()
+    mock_raw.dividends = pd.Series(dtype=float)
+
+    def ticker_side_effect(symbol):
+        if symbol == "ITSA4.SA":
+            return mock_sa
+        return mock_raw
+
+    mock_yf_ticker.side_effect = ticker_side_effect
+
+    value, payment_date = market_data_agent.get_latest_dividend("ITSA4")
+
+    assert value == Decimal("0.7500")
+    assert str(payment_date) == "2026-05-20"
+    mock_yf_ticker.assert_called_once_with("ITSA4.SA")
