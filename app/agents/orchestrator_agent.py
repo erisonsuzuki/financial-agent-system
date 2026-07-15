@@ -1,6 +1,7 @@
 import logging
 import os
-from typing import Optional, cast
+from dataclasses import dataclass
+from typing import Any, Optional, cast
 
 import httpx
 from dotenv import load_dotenv
@@ -15,6 +16,12 @@ logger = logging.getLogger(__name__)
 PROVIDER_MODEL_ENV = {
     "groq": "MAIN_MODEL",
 }
+
+
+@dataclass(frozen=True)
+class AgentInvocationResult:
+    answer: str
+    tool_names: list[str]
 
 
 def configure_langgraph_reviver() -> None:
@@ -111,9 +118,25 @@ def is_transient_llm_error(exc: Exception) -> bool:
     ]
     return any(marker in message for marker in transient_markers)
 
-def invoke_agent(agent_name: str, query: str, context: dict | None = None) -> str:
+def _build_invocation_result(response: dict[str, Any], allowed_tool_names: set[str]) -> AgentInvocationResult:
+    messages = response.get("messages", [])
+    if not messages:
+        return AgentInvocationResult(answer="Could not process the request.", tool_names=[])
+
+    tool_names = [
+        message.name
+        for message in messages
+        if getattr(message, "type", None) == "tool"
+        and isinstance(getattr(message, "name", None), str)
+        and message.name in allowed_tool_names
+    ]
+    return AgentInvocationResult(answer=messages[-1].content, tool_names=tool_names)
+
+
+def invoke_agent_with_result(agent_name: str, query: str, context: dict | None = None) -> AgentInvocationResult:
     config = config_loader.load_config(agent_name)
     primary_provider = config.get("llm", {}).get("provider", "").lower()
+    allowed_tool_names = set(config.get("tools", []))
     agent_executor = create_agent_executor(agent_name, config=config)
 
     try:
@@ -121,10 +144,7 @@ def invoke_agent(agent_name: str, query: str, context: dict | None = None) -> st
         if context is not None:
             payload["context"] = context
         response = agent_executor.invoke(payload)
-        messages = response.get("messages", [])
-        if not messages:
-            return "Could not process the request."
-        return messages[-1].content
+        return _build_invocation_result(response, allowed_tool_names)
     except Exception as exc:
         fallback_model = os.getenv("FALLBACK_MODEL", "").strip()
         primary_model = str(config.get("llm", {}).get("model_name", "")).strip()
@@ -143,8 +163,9 @@ def invoke_agent(agent_name: str, query: str, context: dict | None = None) -> st
             if context is not None:
                 payload["context"] = context
             response = fallback_executor.invoke(payload)
-            messages = response.get("messages", [])
-            if not messages:
-                return "Could not process the request."
-            return messages[-1].content
+            return _build_invocation_result(response, allowed_tool_names)
         raise
+
+
+def invoke_agent(agent_name: str, query: str, context: dict | None = None) -> str:
+    return invoke_agent_with_result(agent_name, query, context).answer

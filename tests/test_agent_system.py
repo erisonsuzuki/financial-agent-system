@@ -94,6 +94,22 @@ def test_invoke_agent_fallback_on_transient_error(monkeypatch):
     assert result == "fallback"
     assert calls == [None, "groq"]
 
+
+def test_invocation_result_records_only_completed_allowed_tools():
+    from app.agents import orchestrator_agent
+
+    messages = [
+        type("Message", (), {"type": "ai", "tool_calls": [{"name": "register_asset_position", "args": {"ticker": "ITSA4"}}]})(),
+        type("Message", (), {"type": "tool", "name": "register_asset_position", "content": "sensitive tool output"})(),
+        type("Message", (), {"type": "tool", "name": "unregistered_tool", "content": "ignored"})(),
+        type("Message", (), {"type": "ai", "content": "Registered asset"})(),
+    ]
+
+    result = orchestrator_agent._build_invocation_result({"messages": messages}, {"register_asset_position"})
+
+    assert result.answer == "Registered asset"
+    assert result.tool_names == ["register_asset_position"]
+
 def test_invoke_agent_no_fallback_on_non_transient_error(monkeypatch):
     from app.agents import orchestrator_agent
 

@@ -36,6 +36,7 @@ graph TD
 5.  The LLM analyzes the request and decides which tool(s) to call and with which arguments.
 6.  The Orchestrator executes the chosen tools (e.g., calls our own API to save data).
 7.  The LLM receives the results from the tools and formulates a final, natural language answer for the user.
+8.  The action log records only the names of tools that completed execution.
 
 ## Tech Stack
 - **Language:** Python 3.11+
