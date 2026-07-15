@@ -19,41 +19,53 @@ describe("assets-summary route", () => {
     expect(body).toEqual({ error: "Unauthorized" });
   });
 
-  it("returns data and marks failing analyses with error field", async () => {
+  it("returns bulk summary data and preserves asset errors", async () => {
     const fetchMock = vi.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
 
     fetchMock.mockImplementation((url: string) => {
-      if (url.includes("/assets/") && !url.includes("/analysis")) {
-        return Promise.resolve(
-          new Response(JSON.stringify([{ id: 1, ticker: "OK", name: "Ok Asset" }, { id: 2, ticker: "BAD", name: "Bad Asset" }])),
-        );
-      }
-      if (url.includes("/assets/OK/analysis")) {
+      if (url.includes("/assets/summary")) {
         return Promise.resolve(
           new Response(
-            JSON.stringify({
-              total_quantity: 10,
-              average_price: "5.5",
-              current_market_price: "6.5",
-              financial_return_value: "10.0",
-              financial_return_percent: "20.0",
-              total_dividends_received: "1.2",
-              total_return_value: "11.2",
-              total_return_percent: "22.4",
-              fetched_at: "2026-01-01T10:00:00Z",
-              is_stale: false,
-            }),
+            JSON.stringify([
+              {
+                id: 1,
+                ticker: "OK",
+                name: "Ok Asset",
+                units: 10,
+                average_price: "5.5",
+                current_price: "6.5",
+                pl_value: "10.0",
+                pl_percent: "20.0",
+                dividends: "1.2",
+                total_return_value: "11.2",
+                total_return_percent: "22.4",
+                price_fetched_at: "2026-01-01T10:00:00Z",
+                is_stale: false,
+              },
+              {
+                id: 2,
+                ticker: "BAD",
+                name: "Bad Asset",
+                units: 0,
+                average_price: "0",
+                current_price: null,
+                pl_value: null,
+                pl_percent: null,
+                dividends: "0",
+                total_return_value: null,
+                total_return_percent: null,
+                price_fetched_at: null,
+                is_stale: false,
+                error: "analysis_unavailable",
+              },
+            ]),
           ),
         );
-      }
-      if (url.includes("/assets/BAD/analysis")) {
-        return Promise.reject(new Error("upstream failure"));
       }
       return Promise.reject(new Error("unexpected url " + url));
     });
 
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const request = new NextRequest(
       new Request("http://localhost/api/assets-summary", { headers: { cookie: "fas_token=testtoken" } }),
     );
@@ -95,27 +107,34 @@ describe("assets-summary route", () => {
         error: "analysis_unavailable",
       },
     ]);
-    expect(consoleSpy).toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/assets/summary"), expect.any(Object));
   });
 
-  it("forwards refresh=true to analysis endpoint", async () => {
+  it("forwards refresh=true to the bulk summary endpoint", async () => {
     const fetchMock = vi.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
 
     fetchMock.mockImplementation((url: string) => {
-      if (url.includes("/assets/") && !url.includes("/analysis")) {
-        return Promise.resolve(new Response(JSON.stringify([{ id: 1, ticker: "OK", name: "Ok Asset" }])));
-      }
-      if (url.includes("/assets/OK/analysis?refresh=true")) {
+      if (url.includes("/assets/summary?refresh=true")) {
         return Promise.resolve(
           new Response(
-            JSON.stringify({
-              total_quantity: 10,
-              average_price: "5.5",
-              current_market_price: null,
-              financial_return_value: null,
-              financial_return_percent: null,
-            }),
+            JSON.stringify([
+              {
+                id: 1,
+                ticker: "OK",
+                name: "Ok Asset",
+                units: 10,
+                average_price: "5.5",
+                current_price: null,
+                pl_value: null,
+                pl_percent: null,
+                dividends: "0",
+                total_return_value: null,
+                total_return_percent: null,
+                price_fetched_at: null,
+                is_stale: false,
+              },
+            ]),
           ),
         );
       }
@@ -131,7 +150,7 @@ describe("assets-summary route", () => {
     expect(res.status).toBe(200);
     expect(body[0].dividends).toBe(0);
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/assets/OK/analysis?refresh=true"),
+      expect.stringContaining("/assets/summary?refresh=true"),
       expect.any(Object),
     );
   });

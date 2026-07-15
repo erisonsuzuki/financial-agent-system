@@ -57,7 +57,11 @@ def handle_router_query(
         )
 
         agent_name = classification.get("agent_name") or "analysis_agent"
-        agent_answer = orchestrator_agent.invoke_agent(agent_name, query.question)
+        agent_result = orchestrator_agent.invoke_agent_with_result(agent_name, query.question)
+        metadata = {
+            **classification,
+            "executed_tool_names": agent_result.tool_names,
+        }
 
         crud.create_agent_action(
             db,
@@ -65,16 +69,16 @@ def handle_router_query(
             payload=schemas.AgentActionCreate(
                 agent_name=agent_name,
                 question=query.question,
-                tool_calls=classification,
-                response=agent_answer,
+                tool_calls=metadata,
+                response=agent_result.answer,
             ),
         )
 
         return schemas.AgentResponseWithMetadata(
             agent=agent_name,
             confidence=classification.get("confidence"),
-            answer=agent_answer,
-            routing_metadata=classification,
+            answer=agent_result.answer,
+            routing_metadata=metadata,
         )
     except Exception as e:
         logger.exception("Router agent query failed")
