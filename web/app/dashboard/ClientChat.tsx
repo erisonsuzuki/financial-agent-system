@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import ChatInput from "@/app/components/ChatInput";
 import ActionLogTable from "@/app/components/ActionLogTable";
 import AssetSidebar from "@/app/components/AssetSidebar";
 import { useAuthToken } from "@/app/hooks/useAuthToken";
@@ -114,9 +113,14 @@ export default function ClientChat({ initialLogs, initialAuth }: ClientChatProps
   }, [isAuthenticated]);
 
   return (
-    <section className="grid gap-6">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)] lg:items-start">
-        <ChatInput onSubmit={handleSubmit} loading={mutation.isPending} isDisabled={!isAuthenticated} />
+    <section className="min-w-0 flex-1 lg:flex lg:min-h-screen">
+      <div className="min-w-0 flex-1 space-y-6 p-4 sm:p-6">
+        <header className="max-w-3xl">
+          <h1 className="text-2xl font-semibold text-on-surface">Financial Agent System</h1>
+          <p className="text-base leading-7 text-on-surface-variant">
+            Your financial operations, managed by dedicated agents.
+          </p>
+        </header>
         <AssetSidebar
           assets={assets}
           loading={assetsLoading}
@@ -127,8 +131,13 @@ export default function ClientChat({ initialLogs, initialAuth }: ClientChatProps
           refreshError={refreshPricesError}
         />
       </div>
-      {mutation.error && <p className="text-sm text-rose-400">{mutation.error.message}</p>}
-      <ActionLogTable entries={logs} />
+      <ActionLogTable
+        entries={logs}
+        onSubmit={handleSubmit}
+        loading={mutation.isPending}
+        isDisabled={!isAuthenticated}
+        error={mutation.error}
+      />
     </section>
   );
 }

@@ -9,10 +9,13 @@ import { useAuthToken } from "@/app/hooks/useAuthToken";
 
 interface Props {
   initialAuth: boolean;
+  compact?: boolean;
 }
 
-export default function LoginButton({ initialAuth }: Props) {
+export default function LoginButton({ initialAuth, compact = false }: Props) {
   const [open, setOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const isAuthenticated = useAuthToken(initialAuth);
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -26,11 +29,40 @@ export default function LoginButton({ initialAuth }: Props) {
     router.refresh();
   };
 
+  const handleLogout = async () => {
+    setLogoutError(null);
+    setLoggingOut(true);
+
+    try {
+      const response = await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+      if (!response.ok) {
+        throw new Error("Unable to log out");
+      }
+      queryClient.clear();
+      router.refresh();
+    } catch (error) {
+      setLogoutError(error instanceof Error ? error.message : "Unable to log out");
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
   if (isAuthenticated) {
     return (
-      <span className="rounded-md border border-emerald-600/60 bg-emerald-900/30 px-4 py-2 text-sm font-semibold text-emerald-200">
-        Logged in
-      </span>
+      <div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={loggingOut}
+          aria-label={compact ? "Log out" : undefined}
+          title={compact ? "Log out" : undefined}
+          className={`flex items-center gap-4 rounded-lg font-mono text-xs font-semibold tracking-widest text-[#bfc6dc] transition hover:bg-surface-high hover:text-on-surface disabled:cursor-not-allowed disabled:opacity-50 ${compact ? "h-10 w-10 justify-center" : "h-12 px-3"}`}
+        >
+          <LogoutIcon />
+          {!compact && (loggingOut ? "LOGGING OUT..." : "LOGOUT")}
+        </button>
+        {logoutError && <p className="mt-2 text-xs text-error">{logoutError}</p>}
+      </div>
     );
   }
 
@@ -39,9 +71,10 @@ export default function LoginButton({ initialAuth }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 hover:border-slate-600"
+        aria-label={compact ? "Log in" : undefined}
+        className={`rounded-md border border-outline-variant bg-surface-container font-mono text-xs font-semibold tracking-wide text-on-surface hover:border-neon ${compact ? "flex h-10 w-10 items-center justify-center" : "px-4 py-2"}`}
       >
-        Login
+        {compact ? <LoginIcon /> : "Login"}
       </button>
       {open && (
         <LoginModal onClose={() => setOpen(false)}>
@@ -50,5 +83,21 @@ export default function LoginButton({ initialAuth }: Props) {
         </LoginModal>
       )}
     </>
+  );
+}
+
+function LoginIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 fill-none stroke-current stroke-2">
+      <path d="M14 5h5v14h-5M10 8l4 4-4 4M14 12H5" />
+    </svg>
+  );
+}
+
+function LogoutIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6 shrink-0 fill-none stroke-current stroke-2">
+      <path d="M10 5H5v14h5M14 8l4 4-4 4M10 12h9" />
+    </svg>
   );
 }
