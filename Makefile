@@ -40,7 +40,7 @@ web-test:
 	npm run test --prefix web
 
 web-audit:
-	docker compose run --rm -e NODE_ENV=development -v $(PWD)/web:/app -v web_node_modules:/app/node_modules -w /app web sh -lc "npm install --include=dev && npm audit --audit-level=high"
+	docker compose run --rm -e NODE_ENV=development -v $(PWD)/web:/app -v web_node_modules:/app/node_modules -w /app web sh -lc "npm ci --include=dev && npm audit --audit-level=high"
 
 audit: api-audit web-audit
 
