@@ -4,7 +4,7 @@ FROM python:3.11-slim
 WORKDIR /code
 
 # Install patched bootstrap tooling and the reviewed Poetry release.
-RUN pip install --no-cache-dir pip==26.2.1 setuptools==83.0.0 poetry==2.4.2
+RUN pip install --no-cache-dir pip==26.2.1 setuptools==84.1.0 poetry==2.4.2
 
 # Copy only dependency files to leverage Docker layer caching
 COPY app/pyproject.toml app/poetry.lock /code/app/
