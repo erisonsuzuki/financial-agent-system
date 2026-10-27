@@ -1,9 +1,9 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
-COPY package.json package-lock.json* tsconfig.json next.config.js tailwind.config.ts postcss.config.js .eslintrc.json ./
+COPY package.json package-lock.json tsconfig.json next.config.js tailwind.config.ts postcss.config.js .eslintrc.json ./
 COPY app ./app
 COPY public ./public
-RUN npm install && npm run build
+RUN npm ci && npm run build
 
 FROM node:24-alpine
 WORKDIR /app
